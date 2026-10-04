@@ -27,7 +27,7 @@
 - `js/engine.js`：共用引擎（迴圈、觸控、選單、音效合成、圖片載入）
 - `js/games/<遊戲>.js`：各遊戲
 - `assets/`：圖片素材（已壓縮，約 750 KB）
-- `sw.js`：離線快取（內容變動後需重新產生版本號）
+- `sw.js`：離線快取。修改任何檔案後執行 `python tools/gen_sw.py` 更新版本號，iPad 才會抓到新版
 
 本機測試：在此資料夾執行 `python -m http.server`，再用瀏覽器開 `http://localhost:8000`。
 
