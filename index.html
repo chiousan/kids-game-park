@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="遊戲樂園">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#1b1446">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>小小遊戲樂園</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="home-page">
+<div class="sky" aria-hidden="true">
+  <img class="star s1" src="assets/run/star.png" alt=""><img class="star s2" src="assets/run/star.png" alt=""><img class="star s3" src="assets/run/star.png" alt=""><img class="star s4" src="assets/run/star.png" alt="">
+</div>
+<header class="hero">
+  <img class="logo" src="assets/run/p_front.png" alt="">
+  <h1>小小遊戲樂園</h1>
+  <p class="tag">沒有廣告・不用網路・安心玩</p>
+</header>
+
+<nav id="cats" class="cats"></nav>
+<main id="grid" class="grid"></main>
+
+<footer class="foot">
+  <p>給家長：本站沒有任何廣告、追蹤或外部連結，遊戲紀錄只存在這台裝置上。</p>
+  <p>遊戲美術素材：Kenney.nl（CC0 公眾領域授權）。</p>
+  <p>在 Safari 按「分享 → 加入主畫面」，就能像 App 一樣全螢幕開啟。</p>
+</footer>
+
+<script src="js/games.js"></script>
+<script>
+(function () {
+  'use strict';
+  var cats = document.getElementById('cats'), grid = document.getElementById('grid');
+  var cur = 'all';
+  try { cur = localStorage.getItem('gg_cat') ? JSON.parse(localStorage.getItem('gg_cat')) : 'all'; } catch (e) { cur = 'all'; }
+  if (!GG.CATS.some(function (c) { return c.id === cur; })) cur = 'all';
+
+  function played(id) {
+    try {
+      for (var d = 0; d < 3; d++) if (localStorage.getItem('gg_best_' + id + '_' + d) !== null) return true;
+    } catch (e) { /* 忽略 */ }
+    return false;
+  }
+
+  function render() {
+    cats.innerHTML = '';
+    GG.CATS.forEach(function (c) {
+      var b = document.createElement('button');
+      b.className = 'cat' + (c.id === cur ? ' on' : '');
+      var dot = document.createElement('span');
+      dot.className = 'dot'; dot.style.background = c.color;
+      b.appendChild(dot);
+      b.appendChild(document.createTextNode(c.name));
+      b.addEventListener('click', function () {
+        cur = c.id;
+        try { localStorage.setItem('gg_cat', JSON.stringify(cur)); } catch (e) { /* 忽略 */ }
+        render();
+      });
+      cats.appendChild(b);
+    });
+    grid.innerHTML = '';
+    GG.GAMES.forEach(function (g, i) {
+      if (cur !== 'all' && g.cat !== cur) return;
+      var a = document.createElement('a');
+      a.className = 'tile';
+      a.href = 'game.html?g=' + g.id;
+      a.style.background = 'linear-gradient(145deg,' + g.c1 + ',' + g.c2 + ')';
+      a.style.animationDelay = (i * 0.03) + 's';
+      var e = document.createElement('img'); e.className = 'tile-icon'; e.src = 'assets/icons/' + g.id + '.png'; e.alt = '';
+      var n = document.createElement('div'); n.className = 'tile-name'; n.textContent = g.name;
+      var d = document.createElement('div'); d.className = 'tile-desc'; d.textContent = g.desc;
+      a.appendChild(e); a.appendChild(n); a.appendChild(d);
+      if (g.cat === 'duo') {
+        var t = document.createElement('span'); t.className = 'badge'; t.textContent = '雙人'; a.appendChild(t);
+      } else if (played(g.id)) {
+        var p = document.createElement('span'); p.className = 'badge'; p.textContent = '玩過'; a.appendChild(p);
+      }
+      grid.appendChild(a);
+    });
+  }
+  render();
+})();
+</script>
+<script src="js/sw-register.js"></script>
+</body>
+</html>

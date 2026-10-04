@@ -1,0 +1,17 @@
+# 系統與編輯器雜檔
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# Claude Code 本機設定
+.claude/
+
+# 暫存與記錄
+*.log
+*.tmp
+node_modules/
+__pycache__/
