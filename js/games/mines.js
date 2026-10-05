@@ -1,6 +1,6 @@
-/* 踩地雷 */
+/* 踩地雷（懶惰重繪） */
 (function () {
-  var C, R, M, cells, first, flagMode, elapsed, opened, ended, cs, ox, oy, pressT, pressCell, longDone, flags, boomAt;
+  var C, R, M, cells, first, flagMode, elapsed, opened, ended, cs, ox, oy, pressT, pressCell, longDone, flags, boomAt, d0;
   var NUMC = ['', '#2f7bff', '#2e9e4f', '#ff4d4d', '#7b3fe4', '#c2410c', '#0e9aa7', '#333', '#777'];
 
   function idx(r, c) { return r * C + c; }
@@ -13,10 +13,8 @@
   }
   function plant(sr, sc) {
     var spots = [];
-    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
-      if (Math.abs(r - sr) <= 1 && Math.abs(c - sc) <= 1) continue;
-      spots.push([r, c]);
-    }
+    // 第一下周圍 2 格內都不放炸彈，保證一開始就能打開一大片
+    for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) if (Math.abs(r - sr) > 1 || Math.abs(c - sc) > 1) spots.push([r, c]);
     GG.shuffle(spots);
     for (var i = 0; i < M; i++) cells[idx(spots[i][0], spots[i][1])].mine = true;
     for (r = 0; r < R; r++) for (c = 0; c < C; c++) {
@@ -26,11 +24,11 @@
     }
   }
   function reveal(r, c) {
-    var stack = [[r, c]];
+    var stack = [[r, c]], k0 = 0;
     while (stack.length) {
       var p = stack.pop(), k = cells[idx(p[0], p[1])];
       if (k.open || k.flag) continue;
-      k.open = true; k.anim = 0; opened++;
+      k.open = true; k.anim = -Math.min(0.4, k0 * 0.012); k0++; opened++;
       if (k.n === 0 && !k.mine) neighbors(p[0], p[1], function (a, b) { if (!cells[idx(a, b)].open) stack.push([a, b]); });
     }
   }
@@ -45,7 +43,6 @@
     }
     if (k.flag) return;
     if (k.open) {
-      // 數字周圍旗子數量對了，就一次打開其餘鄰格
       if (k.n > 0) {
         var f = 0;
         neighbors(r, c, function (a, b) { if (cells[idx(a, b)].flag) f++; });
@@ -61,9 +58,10 @@
     var k = cells[idx(r, c)];
     if (k.mine) {
       k.open = true; ended = true; boomAt = [r, c];
-      cells.forEach(function (q) { if (q.mine) q.open = true; });
-      GG.sfx('boom');
-      GG.over({ score: Math.floor(elapsed), win: false, title: '踩到炸彈了！', scoreText: '再試一次吧', delay: 1200 });
+      cells.forEach(function (q) { if (q.mine) { q.open = true; q.anim = 0; } });
+      GG.sfx('boom'); GG.shake(12, 0.4);
+      GG.burst(ox + (c + 0.5) * cs, oy + (r + 0.5) * cs, { n: 20, colors: ['#ff6b6b', '#ffd23f', '#ff9a2f'], size: cs * 0.3, speed: 360 });
+      GG.over({ score: Math.floor(elapsed), win: false, title: '踩到炸彈了！', scoreText: '再試一次吧', delay: 1300 });
       return;
     }
     reveal(r, c);
@@ -71,79 +69,76 @@
     if (opened === R * C - M) {
       ended = true;
       cells.forEach(function (q) { if (q.mine) q.flag = true; });
-      GG.over({ score: Math.floor(elapsed), win: true, title: '全部找到了！', scoreText: '用了 ' + Math.floor(elapsed) + ' 秒' });
+      var t = Math.floor(elapsed), par = [60, 150, 300][d0];
+      GG.over({ score: t, win: true, stars: t <= par * 0.5 ? 3 : t <= par ? 2 : 1, title: '全部找到了！', scoreText: '用了 ' + t + ' 秒' });
     }
   }
   function layout(w, h) {
     if (!C) return;
-    cs = Math.floor(Math.min((w - 20) / C, (h - 100) / R, 72));
-    ox = Math.round((w - cs * C) / 2); oy = Math.round((h - 90 - cs * R) / 2) + 6;
+    cs = Math.floor(Math.min((w - 24) / C, (h - 110) / R, 76));
+    ox = Math.round((w - cs * C) / 2); oy = Math.round((h - 96 - cs * R) / 2) + 8;
     var bw = Math.min(260, w - 40);
     GG.setPad([{
-      id: 'mode', x: (w - bw) / 2, y: h - 76, w: bw, h: 62, r: 31,
-      label: '挖開模式', fs: 22,
-      color: '#2e7d32',
+      id: 'mode', x: (w - bw) / 2, y: h - 80, w: bw, h: 64, r: 32, label: flagMode ? '插旗模式' : '挖開模式', fs: 24,
+      color: flagMode ? '#ff7043' : '#2e7d32',
       onDown: function () { flagMode = !flagMode; this.label = flagMode ? '插旗模式' : '挖開模式'; this.color = flagMode ? '#ff7043' : '#2e7d32'; GG.sfx('click'); }
     }]);
+    GG.canvasLayer('bg').paint(function (g) {
+      GG.bg(g, w, h, '#bfeaa0', '#86cf62');
+      GG.panel(g, ox - 10, oy - 10, cs * C + 20, cs * R + 20, 18, '#4e9a2e');
+    });
   }
   function cellAt(x, y) {
     var c = Math.floor((x - ox) / cs), r = Math.floor((y - oy) / cs);
-    if (r < 0 || c < 0 || r >= R || c >= C) return null;
-    return [r, c];
+    return r < 0 || c < 0 || r >= R || c >= C ? null : [r, c];
   }
 
   GG.define({
+    lazy: true,
     assets: { bomb: 'run/bomb', flag: 'run/flag_red_a' },
-    fmt: function (v) { return v + ' 秒'; },
     start: function (d) {
+      d0 = d;
       var portrait = GG.H >= GG.W;
-      var cfg = [[8, 8, 8], [9, 12, 16], [12, 16, 36]][d];
+      var cfg = [[8, 8, 6], [9, 12, 12], [10, 14, 24]][d];
       C = portrait ? cfg[0] : cfg[1]; R = portrait ? cfg[1] : cfg[0]; M = cfg[2];
       cells = [];
       for (var i = 0; i < C * R; i++) cells.push({ mine: false, open: false, flag: false, n: 0, anim: 1 });
-      first = true; flagMode = false; elapsed = 0; opened = 0; ended = false; flags = 0; boomAt = null;
-      pressCell = null;
+      first = true; flagMode = false; elapsed = 0; opened = 0; ended = false; flags = 0; boomAt = null; pressCell = null;
       layout(GG.W, GG.H);
     },
     resize: layout,
     update: function (dt) {
+      var busy = false;
       if (!first && !ended) elapsed += dt;
-      cells.forEach(function (k) { if (k.anim < 1) k.anim = Math.min(1, k.anim + dt / 0.2); });
+      cells.forEach(function (k) { if (k.anim < 1) { k.anim = Math.min(1, k.anim + dt / 0.2); busy = true; } });
       if (pressCell && !longDone) {
-        pressT += dt;
+        busy = true; pressT += dt;
         if (pressT > 0.42) { longDone = true; tapCell(pressCell[0], pressCell[1], !flagMode); }
       }
       GG.hud('炸彈 ' + (M - flags) + '・' + Math.floor(elapsed) + ' 秒');
+      return busy;
     },
-    draw: function (ctx, w, h) {
-      GG.bg(ctx, w, h, '#bfeaa0', '#86cf62');
-      ctx.fillStyle = 'rgba(40,90,20,0.3)'; GG.rr(ctx, ox - 10, oy - 4, cs * C + 20, cs * R + 20, 18); ctx.fill();
-      ctx.fillStyle = '#4e9a2e'; GG.rr(ctx, ox - 10, oy - 10, cs * C + 20, cs * R + 20, 18); ctx.fill();
-      ctx.lineWidth = 4; ctx.strokeStyle = GG.INK; GG.rr(ctx, ox - 10, oy - 10, cs * C + 20, cs * R + 20, 18); ctx.stroke();
+    draw: function (ctx) {
       for (var r = 0; r < R; r++) for (var c = 0; c < C; c++) {
         var k = cells[idx(r, c)], x = ox + c * cs, y = oy + r * cs;
-        if (!k.open) {
-          ctx.fillStyle = (r + c) % 2 ? '#62c43c' : '#72d14a';
-          ctx.fillRect(x, y, cs, cs);
+        if (!k.open || k.anim < 0) {
+          ctx.fillStyle = (r + c) % 2 ? '#62c43c' : '#72d14a'; ctx.fillRect(x, y, cs, cs);
           ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(x, y, cs, cs * 0.14);
           ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(x, y + cs * 0.86, cs, cs * 0.14);
           if (pressCell && pressCell[0] === r && pressCell[1] === c && !longDone) {
             ctx.fillStyle = 'rgba(255,255,255,' + Math.min(0.5, pressT) + ')'; ctx.fillRect(x, y, cs, cs);
           }
-          if (k.flag) GG.spr(ctx, 'flag', x + cs / 2 + cs * 0.05, y + cs / 2, cs * 0.72, cs * 0.72);
+          if (k.flag) GG.spr(ctx, 'flag', x + cs * 0.55, y + cs / 2, cs * 0.72, cs * 0.72);
         } else {
-          ctx.fillStyle = (r + c) % 2 ? '#f0d9a8' : '#f7e6bf';
-          if (boomAt && boomAt[0] === r && boomAt[1] === c) ctx.fillStyle = '#ff6b6b';
+          ctx.fillStyle = boomAt && boomAt[0] === r && boomAt[1] === c ? '#ff6b6b' : (r + c) % 2 ? '#f0d9a8' : '#f7e6bf';
           ctx.fillRect(x, y, cs, cs);
-          var s = GG.ease(k.anim);
+          var s = GG.back(Math.max(0, k.anim));
           if (k.mine) GG.spr(ctx, 'bomb', x + cs / 2, y + cs / 2, cs * 0.82 * s, cs * 0.82 * s);
-          else if (k.n) GG.text(ctx, String(k.n), x + cs / 2, y + cs / 2 + 2, cs * 0.62 * s, NUMC[k.n], 'center', '#ffffff');
+          else if (k.n) GG.text(ctx, String(k.n), x + cs / 2, y + cs / 2 + 2, cs * 0.62, NUMC[k.n], 'center', '#ffffff', s);
         }
       }
     },
-    down: function (p) {
-      pressCell = cellAt(p.x, p.y); pressT = 0; longDone = false;
-    },
+    down: function (p) { pressCell = cellAt(p.x, p.y); pressT = 0; longDone = false; },
     move: function (p) {
       var c = cellAt(p.x, p.y);
       if (!c || !pressCell || c[0] !== pressCell[0] || c[1] !== pressCell[1]) pressCell = null;

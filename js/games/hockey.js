@@ -1,6 +1,6 @@
 /* 桌上冰球：兩人面對面，或對電腦 */
 (function () {
-  var W, H, rk, R, pr, gw, puck, ms, score, mode, freezeT, msg, WIN = 7, aiSpeed;
+  var W, H, rk, R, pr, gw, puck, ms, score, mode, freezeT, msg, WIN = 5, aiSpeed;
 
   function layout() {
     W = GG.W; H = GG.H;
@@ -10,6 +10,22 @@
     R = Math.min(rk.w, rk.h) * 0.075;
     pr = R * 0.66;
     gw = Math.min(rk.w * 0.4, 300);
+    GG.canvasLayer('bg').paint(function (g) {
+      GG.bg(g, W, H, '#2a6fd6', '#174a9e');
+      g.fillStyle = 'rgba(0,0,0,0.25)'; GG.rr(g, rk.x0, rk.y0 + 6, rk.w, rk.h, 30); g.fill();
+      g.fillStyle = '#eef8ff'; GG.rr(g, rk.x0, rk.y0, rk.w, rk.h, 30); g.fill();
+      // 冰面線條
+      g.strokeStyle = '#ff6b6b'; g.lineWidth = 6;
+      g.beginPath(); g.moveTo(rk.x0, rk.cy); g.lineTo(rk.x1, rk.cy); g.stroke();
+      g.strokeStyle = '#7cc4ff'; g.lineWidth = 5;
+      g.beginPath(); g.arc(rk.cx, rk.cy, Math.min(rk.w, rk.h) * 0.16, 0, Math.PI * 2); g.stroke();
+      g.beginPath(); g.arc(rk.cx, rk.y0, gw * 0.55, 0, Math.PI); g.stroke();
+      g.beginPath(); g.arc(rk.cx, rk.y1, gw * 0.55, Math.PI, Math.PI * 2); g.stroke();
+      g.lineWidth = 6; g.strokeStyle = GG.INK; GG.rr(g, rk.x0, rk.y0, rk.w, rk.h, 30); g.stroke();
+      // 球門
+      g.fillStyle = '#ff6b6b'; GG.rr(g, rk.cx - gw / 2, rk.y0 - 8, gw, 14, 7); g.fill();
+      g.fillStyle = '#4fa3ff'; GG.rr(g, rk.cx - gw / 2, rk.y1 - 6, gw, 14, 7); g.fill();
+    });
   }
   function resetPositions(serveTo) {
     puck = { x: rk.cx, y: rk.cy + (serveTo === 0 ? 1 : serveTo === 1 ? -1 : 0) * rk.h * 0.12, vx: 0, vy: 0 };
@@ -72,7 +88,7 @@
     assets: { blue: 'board/chipBlueWhite_border', red: 'board/chipRedWhite_border', puck: 'board/chipBlackWhite' },
     start: function (m) {
       mode = m; layout();
-      aiSpeed = Math.min(W, H) * (m === 1 ? 0.55 : 1.25);
+      aiSpeed = Math.min(W, H) * (m === 1 ? 0.4 : 0.85);
       score = [0, 0]; freezeT = 0.6; msg = '';
       resetPositions(0);
       GG.hud('藍 0 : 0 紅');
@@ -111,20 +127,6 @@
       puck.vx *= f; puck.vy *= f;
     },
     draw: function (ctx, w, h) {
-      GG.bg(ctx, w, h, '#2a6fd6', '#174a9e');
-      ctx.fillStyle = 'rgba(0,0,0,0.25)'; GG.rr(ctx, rk.x0, rk.y0 + 6, rk.w, rk.h, 30); ctx.fill();
-      ctx.fillStyle = '#eef8ff'; GG.rr(ctx, rk.x0, rk.y0, rk.w, rk.h, 30); ctx.fill();
-      // 冰面線條
-      ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(rk.x0, rk.cy); ctx.lineTo(rk.x1, rk.cy); ctx.stroke();
-      ctx.strokeStyle = '#7cc4ff'; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(rk.cx, rk.cy, Math.min(rk.w, rk.h) * 0.16, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(rk.cx, rk.y0, gw * 0.55, 0, Math.PI); ctx.stroke();
-      ctx.beginPath(); ctx.arc(rk.cx, rk.y1, gw * 0.55, Math.PI, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = 6; ctx.strokeStyle = GG.INK; GG.rr(ctx, rk.x0, rk.y0, rk.w, rk.h, 30); ctx.stroke();
-      // 球門
-      ctx.fillStyle = '#ff6b6b'; GG.rr(ctx, rk.cx - gw / 2, rk.y0 - 8, gw, 14, 7); ctx.fill();
-      ctx.fillStyle = '#4fa3ff'; GG.rr(ctx, rk.cx - gw / 2, rk.y1 - 6, gw, 14, 7); ctx.fill();
       // 比分（上方的字轉 180 度給對面的人看）
       GG.text(ctx, String(score[0]), rk.x0 + 40, rk.cy + 50, 56, 'rgba(79,163,255,0.55)');
       ctx.save(); ctx.translate(rk.x1 - 40, rk.cy - 50); ctx.rotate(Math.PI);

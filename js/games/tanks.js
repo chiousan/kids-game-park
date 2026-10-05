@@ -27,6 +27,15 @@
       });
     });
     setPad();
+    GG.canvasLayer('bg').paint(function (g, w, h) {
+      g.fillStyle = '#3d4a2a'; g.fillRect(0, 0, w, h);
+      GG.tile(g, 'grass', ar.x, ar.y, ar.w, ar.h, cell, 0, 0);
+      g.lineWidth = 5; g.strokeStyle = GG.INK; g.strokeRect(ar.x - 2.5, ar.y - 2.5, ar.w + 5, ar.h + 5);
+      walls.forEach(function (wl) {
+        g.fillStyle = 'rgba(0,0,0,0.25)'; g.fillRect(wl.x + 5, wl.y + 7, wl.w, wl.h);
+        g.drawImage(GG.img[wl.img], wl.x, wl.y, wl.w, wl.h);
+      });
+    });
   }
   function spawnPos(i) {
     return { x: ar.x + ar.w / 2, y: i === 0 ? ar.y + ar.h - cell * 0.5 : ar.y + cell * 0.5, a: i === 0 ? -Math.PI / 2 : Math.PI / 2 };
@@ -125,13 +134,13 @@
   }
   function aiThink(tk, dt) {
     var e = tanks[0], hard = mode === 2;
-    tk.turn = hard ? 6 : 3.5;
+    tk.turn = hard ? 4.5 : 2.5;
     if (e.dead) { tk.mag = 0; tk.fire = false; return; }
     var ang = Math.atan2(e.y - tk.y, e.x - tk.x), see = lineClear(tk.x, tk.y, e.x, e.y);
     var diff = ang - tk.a;
     while (diff > Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    tk.fire = see && Math.abs(diff) < (hard ? 0.12 : 0.3) && Math.random() < (hard ? 0.5 : 0.08);
+    tk.fire = see && Math.abs(diff) < (hard ? 0.15 : 0.35) && Math.random() < (hard ? 0.22 : 0.04);
     if (tk.wanderT > 0) {
       tk.wanderT -= dt; tk.ax = Math.cos(tk.wanderA); tk.ay = Math.sin(tk.wanderA); tk.mag = 1; return;
     }
@@ -148,7 +157,7 @@
   function destroy(tk) {
     tk.dead = 1.4; tk.mag = 0;
     booms.push({ x: tk.x, y: tk.y, t: 0 });
-    GG.sfx('boom');
+    GG.sfx('boom'); GG.shake(10, 0.3);
     kills[1 - tk.i]++;
     GG.hud('藍 ' + kills[0] + ' : ' + kills[1] + ' 紅');
     if (kills[1 - tk.i] >= WIN) {
@@ -236,13 +245,6 @@
       for (i = booms.length - 1; i >= 0; i--) { booms[i].t += dt; if (booms[i].t > 0.6) booms.splice(i, 1); }
     },
     draw: function (ctx, w, h) {
-      ctx.fillStyle = '#3d4a2a'; ctx.fillRect(0, 0, w, h);
-      GG.tile(ctx, 'grass', ar.x, ar.y, ar.w, ar.h, cell, 0, 0);
-      ctx.lineWidth = 5; ctx.strokeStyle = GG.INK; ctx.strokeRect(ar.x - 2.5, ar.y - 2.5, ar.w + 5, ar.h + 5);
-      walls.forEach(function (wl) {
-        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(wl.x + 5, wl.y + 7, wl.w, wl.h);
-        ctx.drawImage(GG.img[wl.img], wl.x, wl.y, wl.w, wl.h);
-      });
       bullets.forEach(function (b) { GG.spr(ctx, b.img, b.x, b.y, cell * 0.14, cell * 0.25, { rot: Math.atan2(b.vy, b.vx) + Math.PI / 2 }); });
       tanks.forEach(function (tk) {
         if (tk.dead) return;

@@ -10,6 +10,25 @@
     var bw = Math.min(220, w * 0.4);
     GG.setPad([{ id: 'undo', x: (w - bw) / 2, y: h - ctrl + 12, w: bw, h: ctrl - 26, r: 28, label: '悔棋', fs: 24, color: '#8d5a2b',
       onDown: undo }]);
+    GG.canvasLayer('bg').paint(function (g, w, h) {
+      GG.bg(g, w, h, '#f6d7a7', '#e2ae6c');
+      var bs = cs * N;
+      g.fillStyle = 'rgba(90,50,20,0.35)'; GG.rr(g, ox - 12, oy - 6, bs + 24, bs + 24, 20); g.fill();
+      var gr = g.createLinearGradient(ox, oy, ox + bs, oy + bs);
+      gr.addColorStop(0, '#f2c57c'); gr.addColorStop(1, '#dca35a');
+      g.fillStyle = gr; GG.rr(g, ox - 12, oy - 12, bs + 24, bs + 24, 20); g.fill();
+      g.lineWidth = 4; g.strokeStyle = GG.INK; GG.rr(g, ox - 12, oy - 12, bs + 24, bs + 24, 20); g.stroke();
+      g.strokeStyle = 'rgba(80,45,15,0.7)'; g.lineWidth = 2;
+      g.beginPath();
+      for (var i = 0; i < N; i++) {
+        var p = ox + cs * (i + 0.5);
+        g.moveTo(p, oy + cs / 2); g.lineTo(p, oy + bs - cs / 2);
+        g.moveTo(ox + cs / 2, oy + cs * (i + 0.5)); g.lineTo(ox + bs - cs / 2, oy + cs * (i + 0.5));
+      }
+      g.stroke();
+      g.fillStyle = 'rgba(80,45,15,0.8)';
+      [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]].forEach(function (q) { g.beginPath(); g.arc(ox + cs * (q[1] + 0.5), oy + cs * (q[0] + 0.5), 4.5, 0, Math.PI * 2); g.fill(); });
+    });
   }
   function at(r, c) { return r >= 0 && c >= 0 && r < N && c < N ? board[r][c] : -2; }
   var DIRS = [[0, 1], [1, 0], [1, 1], [1, -1]];
@@ -30,6 +49,7 @@
     var line = lineFrom(r, c, turn);
     if (line) {
       winLine = line; over = true;
+      line.forEach(function (q) { GG.burst(ox + cs * (q[1] + 0.5), oy + cs * (q[0] + 0.5), { n: 4, img: '_star', size: cs * 0.5, speed: 220 }); });
       var title = mode ? (turn === 0 ? '你贏了！' : '電腦贏了！') : NAME[turn] + '獲勝！';
       GG.over({ win: mode ? turn === 0 : true, title: title, text: '一共下了 ' + history.length + ' 手', delay: 1100 });
       return;
@@ -78,17 +98,18 @@
       for (var dr = -2; dr <= 2 && !near; dr++) for (var dc = -2; dc <= 2; dc++) if (at(r + dr, c + dc) >= 0) { near = true; break; }
       if (!near) continue;
       var atk = evalCell(r, c, 1), def = evalCell(r, c, 0);
-      var s = mode === 2 ? atk * 1.1 + def : atk + def * 0.55 + Math.random() * 400;
+      var s = mode === 2 ? atk + def * 0.9 + Math.random() * 60 : atk + def * 0.35 + Math.random() * 700;
       cand.push({ r: r, c: c, s: s });
     }
     cand.sort(function (a, b) { return b.s - a.s; });
     // 簡單模式偶爾不選最好的那一步
     var pick = cand[0];
-    if (mode === 1 && cand.length > 2 && cand[0].s < 10000 && Math.random() < 0.35) pick = cand[GG.randInt(1, Math.min(3, cand.length - 1))];
+    if (mode === 1 && cand.length > 2 && cand[0].s < 10000 && Math.random() < 0.5) pick = cand[GG.randInt(1, Math.min(3, cand.length - 1))];
     return [pick.r, pick.c];
   }
 
   GG.define({
+    lazy: true,
     modes: [
       { label: '雙人對戰', value: 0, cls: 'b-blue' },
       { label: '對電腦・簡單', value: 1, cls: 'b-easy' },
@@ -105,30 +126,15 @@
     },
     resize: function (w, h) { if (board) layout(w, h); },
     update: function (dt) {
+      var busy = lastPop < 1 || thinking;
       if (lastPop < 1) lastPop = Math.min(1, lastPop + dt / 0.25);
       if (thinking && !over) {
         aiT -= dt;
         if (aiT <= 0) { thinking = false; var mv = aiMove(); place(mv[0], mv[1]); }
       }
+      return busy;
     },
     draw: function (ctx, w, h) {
-      GG.bg(ctx, w, h, '#f6d7a7', '#e2ae6c');
-      var bs = cs * N;
-      ctx.fillStyle = 'rgba(90,50,20,0.35)'; GG.rr(ctx, ox - 12, oy - 6, bs + 24, bs + 24, 20); ctx.fill();
-      var g = ctx.createLinearGradient(ox, oy, ox + bs, oy + bs);
-      g.addColorStop(0, '#f2c57c'); g.addColorStop(1, '#dca35a');
-      ctx.fillStyle = g; GG.rr(ctx, ox - 12, oy - 12, bs + 24, bs + 24, 20); ctx.fill();
-      ctx.lineWidth = 4; ctx.strokeStyle = GG.INK; GG.rr(ctx, ox - 12, oy - 12, bs + 24, bs + 24, 20); ctx.stroke();
-      ctx.strokeStyle = 'rgba(80,45,15,0.7)'; ctx.lineWidth = 2;
-      ctx.beginPath();
-      for (var i = 0; i < N; i++) {
-        var p = ox + cs * (i + 0.5);
-        ctx.moveTo(p, oy + cs / 2); ctx.lineTo(p, oy + bs - cs / 2);
-        ctx.moveTo(ox + cs / 2, oy + cs * (i + 0.5)); ctx.lineTo(ox + bs - cs / 2, oy + cs * (i + 0.5));
-      }
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(80,45,15,0.8)';
-      [[3, 3], [3, 9], [9, 3], [9, 9], [6, 6]].forEach(function (q) { ctx.beginPath(); ctx.arc(ox + cs * (q[1] + 0.5), oy + cs * (q[0] + 0.5), 4.5, 0, Math.PI * 2); ctx.fill(); });
       var last = history[history.length - 1];
       for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) {
         var v = board[r][c];
