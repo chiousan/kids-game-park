@@ -4,6 +4,34 @@
   var C = 10, grid, parity, colors, R, rowH, left, top, shooter, loseY, cur, nxt, shot, aim, pops, falls, score, shotsLeftRow, perRow, d0, dirty, over;
   var ASSETS = {};
   ALL.forEach(function (c) { ASSETS[c] = 'blob/' + c + '_happy'; ASSETS[c + 'd'] = 'blob/' + c + '_dizzy'; });
+  ASSETS.bomb = 'run/bomb';
+  /* 清光一關就進下一關（共 5 關）：
+     2 關彩虹泡泡（變成旁邊最多的顏色）、3 關石頭泡泡（打不破，只能讓它掉下來）、4 關炸彈泡泡（炸掉周圍）、5 關顏色更多、下降更快 */
+  var STONE = 6, RAINBOW = 7, BOMB = 8;
+  var LV_MSG = ['', '新獎勵：彩虹泡泡（變成旁邊最多的顏色）', '新障礙：石頭泡泡（打不破，要讓它掉下來）', '新獎勵：炸彈泡泡（炸掉周圍一圈）', '顏色變多、下降更快了！'];
+  var lvl = 1, stoneSpr = null, rainSpr = null;
+  function bubbleImg(col, dizzy) {
+    if (col === STONE) return stoneSpr;
+    if (col === RAINBOW) return rainSpr;
+    if (col === BOMB) return 'bomb';
+    return ALL[col] + (dizzy ? 'd' : '');
+  }
+  function makeSprites() {
+    stoneSpr = GG.sprite(64, 64, function (g) {
+      g.fillStyle = '#9a98a8'; g.beginPath(); g.arc(32, 32, 28, 0, 7); g.fill();
+      g.lineWidth = 4; g.strokeStyle = GG.INK; g.stroke();
+      g.strokeStyle = 'rgba(58,56,80,0.5)'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(18, 24); g.lineTo(30, 32); g.lineTo(26, 46); g.moveTo(30, 32); g.lineTo(46, 28); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.beginPath(); g.ellipse(24, 18, 10, 5, -0.4, 0, 7); g.fill();
+    });
+    rainSpr = GG.sprite(64, 64, function (g) {
+      ['#ff5c5c', '#ffb02e', '#ffe14d', '#43d17a', '#4fa3ff', '#b07cff'].forEach(function (c, i) {
+        g.fillStyle = c; g.beginPath(); g.moveTo(32, 32); g.arc(32, 32, 28, i * Math.PI / 3, (i + 1) * Math.PI / 3); g.closePath(); g.fill();
+      });
+      g.lineWidth = 4; g.strokeStyle = GG.INK; g.beginPath(); g.arc(32, 32, 28, 0, 7); g.stroke();
+      GG.spr(g, '_star', 32, 32, 30, 30);
+    });
+  }
 
   function shifted(r) { return (r + parity) % 2 === 1; }
   function rowLen(r) { return shifted(r) ? C - 1 : C; }
@@ -16,12 +44,12 @@
   }
   function newRow() {
     var row = [];
-    for (var c = 0; c < C; c++) row.push(c > 0 && Math.random() < 0.45 ? row[c - 1] : GG.randInt(0, colors - 1));
+    for (var c = 0; c < C; c++) row.push(lvl >= 3 && Math.random() < 0.08 ? STONE : c > 0 && row[c - 1] !== STONE && Math.random() < 0.45 ? row[c - 1] : GG.randInt(0, colors - 1));
     return row;
   }
   function present() {
     var s = {};
-    grid.forEach(function (row, r) { for (var c = 0; c < rowLen(r); c++) if (row[c] >= 0) s[row[c]] = 1; });
+    grid.forEach(function (row, r) { for (var c = 0; c < rowLen(r); c++) if (row[c] >= 0 && row[c] < STONE) s[row[c]] = 1; });
     var k = Object.keys(s).map(Number);
     return k.length ? k : [0];
   }
@@ -46,11 +74,26 @@
     dirty = false;
     GG.canvasLayer('grid').paint(function (g) {
       grid.forEach(function (row, r) {
-        for (var c = 0; c < rowLen(r); c++) if (row[c] >= 0) { var p = pos(r, c); GG.spr(g, ALL[row[c]], p[0], p[1], R * 2.08, R * 2.08); }
+        for (var c = 0; c < rowLen(r); c++) if (row[c] >= 0) { var p = pos(r, c); GG.spr(g, bubbleImg(row[c]), p[0], p[1], R * 2.08, R * 2.08); }
       });
     });
   }
-  function nextColor() { return GG.pick(present()); }
+  function nextColor() {
+    var q = Math.random();
+    if (lvl >= 4 && q < 0.06) return BOMB;
+    if (lvl >= 2 && q < 0.14) return RAINBOW;
+    return GG.pick(present());
+  }
+  function groupOf(r0, c0, col) {
+    var seen = {}, stack = [[r0, c0]], group = [];
+    while (stack.length) {
+      var q = stack.pop(), k = q[0] + ',' + q[1];
+      if (seen[k] || !valid(q[0], q[1]) || grid[q[0]][q[1]] !== col) continue;
+      seen[k] = 1; group.push(q);
+      nbrs(q[0], q[1]).forEach(function (n) { stack.push(n); });
+    }
+    return group;
+  }
   function snap(x, y) {
     var r0 = Math.max(0, Math.round((y - top - R) / rowH)), best = null;
     while (grid.length <= r0 + 1) { var e = []; for (var i = 0; i < C; i++) e.push(-1); grid.push(e); }
@@ -64,18 +107,34 @@
   function land(x, y, col) {
     var b = snap(x, y);
     if (!b) return;
-    grid[b.r][b.c] = col;
     GG.sfx('bounce');
-    // 找同色相連
-    var seen = {}, stack = [[b.r, b.c]], group = [];
-    while (stack.length) {
-      var q = stack.pop(), k = q[0] + ',' + q[1];
-      if (seen[k] || !valid(q[0], q[1]) || grid[q[0]][q[1]] !== col) continue;
-      seen[k] = 1; group.push(q);
-      nbrs(q[0], q[1]).forEach(function (n) { stack.push(n); });
+    var group = [];
+    if (col === RAINBOW) {
+      // 彩虹：試試旁邊每一種顏色，選能連最多的
+      var best = -1, bestN = 0;
+      nbrs(b.r, b.c).forEach(function (n) {
+        if (!valid(n[0], n[1]) || grid[n[0]][n[1]] < 0 || grid[n[0]][n[1]] >= STONE) return;
+        var cc = grid[n[0]][n[1]];
+        grid[b.r][b.c] = cc;
+        var gn = groupOf(b.r, b.c, cc).length;
+        if (gn > bestN) { bestN = gn; best = cc; }
+      });
+      col = best >= 0 ? best : GG.pick(present());
+    }
+    if (col === BOMB) {
+      // 炸彈：炸掉周圍一圈（石頭也炸得掉）
+      grid[b.r][b.c] = -1;
+      var p1 = pos(b.r, b.c);
+      grid.forEach(function (row, r) { for (var c = 0; c < rowLen(r); c++) if (row[c] >= 0 && GG.dist(pos(r, c)[0], pos(r, c)[1], p1[0], p1[1]) < R * 4.2) group.push([r, c]); });
+      GG.sfx('boom'); GG.shake(8, 0.3);
+      GG.burst(p1[0], p1[1], { n: 18, colors: ['#ffb347', '#fff3a0', '#ff6b6b'], size: R * 0.5, speed: 340 });
+    } else {
+      grid[b.r][b.c] = col;
+      group = groupOf(b.r, b.c, col);
+      if (group.length < 3) group = [];
     }
     var popped = false;
-    if (group.length >= 3) {
+    if (group.length) {
       popped = true;
       group.forEach(function (q) {
         var p = pos(q[0], q[1]);
@@ -124,20 +183,36 @@
     }
     dirty = true;
     if (!grid.length) {
+      score += 300; GG.setScore(score);
+      if (lvl < 5) {
+        lvl++; GG.sfx('win'); GG.floatText(GG.W / 2, GG.H * 0.4, '清光了！+300', '#ffe14d', 40);
+        over = true;
+        setTimeout(function () { if (GG.state() === 'play') { buildLevel(); GG.redraw(); } }, 900);
+        return;
+      }
       over = true;
-      score += 500; GG.setScore(score);
-      GG.over({ score: score, win: true, stars: 3, title: '全部清光了！', text: '清場獎勵 +500', delay: 800 });
+      GG.over({ score: score, win: true, stars: 3, title: '5 關全部清光！', text: '每關清場 +300', delay: 800 });
       return;
     }
     for (var rr = 0; rr < grid.length; rr++) for (var cc = 0; cc < rowLen(rr); cc++) {
       if (grid[rr][cc] >= 0 && pos(rr, cc)[1] + R > loseY) {
         over = true;
-        GG.over({ score: score, stars: GG.starsFor(score, 300, 800, 1500), title: '泡泡碰到線了！', delay: 800 });
+        GG.over({ score: score, stars: GG.starsFor(lvl, 2, 3, 5), title: '泡泡碰到線了！', text: '到第 ' + lvl + ' 關', delay: 800 });
         return;
       }
     }
     cur = nxt; nxt = nextColor();
-    if (present().indexOf(cur) < 0) cur = nextColor();
+    if (cur < STONE && present().indexOf(cur) < 0) cur = GG.pick(present());
+  }
+  function buildLevel() {
+    colors = Math.min(6, [3, 4, 5][d0] + Math.floor((lvl - 1) / 2) + (lvl >= 5 ? 1 : 0));
+    perRow = Math.max(3, [9, 7, 5][d0] - (lvl - 1)); shotsLeftRow = perRow;
+    parity = 0; grid = [];
+    for (var r = 0; r < Math.min(8, [4, 5, 6][d0] + lvl - 1); r++) grid.push(newRow());
+    pops = []; falls = []; shot = null; aim = null; over = false;
+    layout(GG.W, GG.H);
+    cur = GG.pick(present()); nxt = nextColor();
+    if (lvl > 1) GG.banner('第 ' + lvl + ' 關', LV_MSG[lvl - 1]);
   }
   function aimAngle(p) {
     var a = Math.atan2(p.y - shooter.y, p.x - shooter.x);
@@ -164,17 +239,15 @@
     return pts;
   }
 
+  // 測試用：直接跳到第 n 關（截圖檢查用）
+  GG.testLevel = function (n) { lvl = n; buildLevel(); };
+
   GG.define({
     assets: ASSETS,
     start: function (d) {
-      d0 = d;
-      colors = [4, 5, 6][d];
-      perRow = [9, 7, 5][d]; shotsLeftRow = perRow;
-      parity = 0; grid = [];
-      for (var r = 0; r < [4, 5, 6][d]; r++) grid.push(newRow());
-      pops = []; falls = []; score = 0; shot = null; aim = null; over = false;
-      layout(GG.W, GG.H);
-      cur = nextColor(); nxt = nextColor();
+      d0 = d; lvl = 1; score = 0;
+      if (!stoneSpr) makeSprites();
+      buildLevel();
       GG.setScore(0);
     },
     resize: function (w, h) { if (grid) layout(w, h); },
@@ -204,14 +277,16 @@
         pts.forEach(function (q, i) { ctx.globalAlpha = 1 - i / (pts.length + 2); ctx.beginPath(); ctx.arc(q[0], q[1], R * 0.18, 0, Math.PI * 2); ctx.fill(); });
         ctx.globalAlpha = 1;
       }
-      pops.forEach(function (p) { var k = p.t / 0.3; GG.spr(ctx, ALL[p.col] + 'd', p.x, p.y, R * 2.08 * (1 + k * 0.4), R * 2.08 * (1 + k * 0.4), { alpha: 1 - k }); });
-      falls.forEach(function (f) { GG.spr(ctx, ALL[f.col] + 'd', f.x, f.y, R * 2.08, R * 2.08); });
-      if (shot) GG.spr(ctx, ALL[shot.col], shot.x, shot.y, R * 2.08, R * 2.08);
-      else if (!over) GG.spr(ctx, ALL[cur], shooter.x, shooter.y, R * 2.2, R * 2.2);
-      GG.spr(ctx, ALL[nxt], shooter.x + R * 2.6, shooter.y + R * 0.6, R * 1.3, R * 1.3);
-      GG.text(ctx, '下一顆', shooter.x + R * 2.6, shooter.y + R * 1.6, 14, '#fff', 'center', true);
-      GG.text(ctx, '再 ' + shotsLeftRow + ' 發會下降', shooter.x - R * 4.2, shooter.y + R * 0.6, 15, '#fff', 'center', true);
+      pops.forEach(function (p) { var k = p.t / 0.3; GG.spr(ctx, bubbleImg(p.col, true), p.x, p.y, R * 2.08 * (1 + k * 0.4), R * 2.08 * (1 + k * 0.4), { alpha: 1 - k }); });
+      falls.forEach(function (f) { GG.spr(ctx, bubbleImg(f.col, true), f.x, f.y, R * 2.08, R * 2.08); });
+      if (shot) GG.spr(ctx, bubbleImg(shot.col), shot.x, shot.y, R * 2.08, R * 2.08);
+      else if (!over) GG.spr(ctx, bubbleImg(cur), shooter.x, shooter.y, R * 2.2, R * 2.2);
+      GG.spr(ctx, bubbleImg(nxt), shooter.x + R * 2.6, shooter.y + R * 0.6, R * 1.3, R * 1.3);
+      GG.hudText(ctx, '第 ' + lvl + ' 關', GG.W - 18, 30, 22, '#fff', 'right');
+      GG.text(ctx, '下一顆', shooter.x + R * 2.6, shooter.y + R * 1.7, 19, '#fff', 'center', true);
+      GG.hudText(ctx, '再 ' + shotsLeftRow + ' 發會下降', shooter.x - R * 4.4, shooter.y + R * 0.6, 19, shotsLeftRow <= 2 ? '#ffd23f' : '#fff', 'center');
     },
+    hintAt: function () { return { x: shooter.x, y: shooter.y - 40, dx: 0.7, dy: -1.6, tip: '按住瞄準，放開發射', ty: shooter.y - 230 }; },
     down: function (p) { aim = { a: aimAngle(p) }; },
     move: function (p) { if (aim) aim.a = aimAngle(p); },
     up: function (p) {

@@ -3,10 +3,23 @@
   var N = 8, TYPES = 6, grid, score, timeLeft, totalT, phase, combo, sel, swapA, swapB, swapT, swapBack, d0;
   var bx, by, bs, cell, hintT, hint;
   var GEMS = ['red_diamond', 'blue_square', 'green_polygon', 'yellow_diamond', 'purple_polygon', 'grey_square'];
-  var ASSETS = { sel: 'puzzle/selector' };
+  var ASSETS = { sel: 'puzzle/selector', bomb: 'run/bomb' };
   GEMS.forEach(function (g, i) { ASSETS['g' + i] = 'puzzle/gem_' + g; });
 
-  function gem(t, r) { return { t: t, y: r, scale: 1, dying: false }; }
+  /* 關卡（依分數）：2 關 4 顆一樣會留下「炸彈寶石」、3 關出現冰塊（不能移動，要消兩次）、
+     4 關出現時鐘寶石（+5 秒）、5 關多一種顏色 */
+  var LV_AT = [0, 300, 800, 1500, 2400];
+  var LV_MSG = ['', '新獎勵：一次消 4 顆會變出炸彈寶石', '新障礙：冰塊寶石（不能移動，要消兩次）', '新獎勵：時鐘寶石（消掉 +5 秒）', '多了一種顏色，更難了！'];
+  var lvl = 1;
+  function gem(t, r) {
+    var g = { t: t, y: r, scale: 1, dying: false };
+    if (lvl >= 3 && Math.random() < 0.04) g.ice = true;
+    else if (lvl >= 4 && Math.random() < 0.04) g.special = 'clock';
+    return g;
+  }
+  function freeze(n) {
+    for (var k = 0; k < n; k++) { var g = grid[GG.randInt(0, N - 1)][GG.randInt(0, N - 1)]; if (g && !g.special) g.ice = true; }
+  }
   function newType(r, c) {
     var t, tries = 0;
     do { t = GG.randInt(0, TYPES - 1); tries++; }
@@ -17,7 +30,7 @@
   function fill() {
     grid = [];
     for (var r = 0; r < N; r++) { grid.push([]); for (var c = 0; c < N; c++) grid[r].push(null); }
-    for (r = 0; r < N; r++) for (c = 0; c < N; c++) grid[r][c] = gem(newType(r, c), r - N - 1);
+    for (r = 0; r < N; r++) for (c = 0; c < N; c++) { grid[r][c] = gem(newType(r, c), r - N - 1); grid[r][c].ice = false; grid[r][c].special = null; }
     if (!findMove()) fill();
   }
   function findMatches() {
@@ -43,7 +56,7 @@
       var dirs = [[0, 1], [1, 0]];
       for (var d = 0; d < 2; d++) {
         var r2 = r + dirs[d][0], c2 = c + dirs[d][1];
-        if (r2 >= N || c2 >= N) continue;
+        if (r2 >= N || c2 >= N || grid[r][c].ice || grid[r2][c2].ice) continue;
         swapCells([r, c], [r2, c2]);
         var ok = findMatches();
         swapCells([r, c], [r2, c2]);
@@ -55,18 +68,51 @@
   function trySwap(a, b) {
     if (phase !== 'idle') return;
     if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) !== 1) return;
+    if (grid[a[0]][a[1]].ice || grid[b[0]][b[1]].ice) { GG.sfx('hit'); GG.shake(3, 0.1); sel = null; return; }
     swapA = a; swapB = b; swapT = 0; swapBack = false; phase = 'swap'; sel = null; hint = null; hintT = 0;
     GG.sfx('move');
   }
   function clearMatches(m) {
-    var n = 0, cx = 0, cy = 0;
-    for (var r = 0; r < N; r++) for (var c = 0; c < N; c++) if (m[r][c]) {
-      grid[r][c].dying = true; n++; cx += c; cy += r;
+    var n = 0, cx = 0, cy = 0, r, c, cnt = 0, first = null;
+    for (r = 0; r < N; r++) for (c = 0; c < N; c++) if (m[r][c]) { cnt++; if (!first) first = [r, c]; }
+    // 4 顆以上：留一顆變成炸彈寶石（第 2 關起）
+    var makeBomb = null;
+    if (lvl >= 2 && cnt >= 4 && combo === 0) {
+      makeBomb = swapB && m[swapB[0]][swapB[1]] ? swapB : swapA && m[swapA[0]][swapA[1]] ? swapA : first;
+      if (grid[makeBomb[0]][makeBomb[1]].ice || grid[makeBomb[0]][makeBomb[1]].special === 'bomb') makeBomb = null;
+    }
+    // 炸彈寶石被消掉時，連周圍 3x3 一起炸
+    var q = [];
+    for (r = 0; r < N; r++) for (c = 0; c < N; c++) if (m[r][c] && grid[r][c].special === 'bomb') q.push([r, c]);
+    while (q.length) {
+      var b = q.pop();
+      GG.burst(bx + (b[1] + 0.5) * cell, by + (b[0] + 0.5) * cell, { n: 14, colors: ['#ffb347', '#fff3a0', '#ff6b6b'], size: cell * 0.2, speed: 320 });
+      GG.sfx('boom'); GG.shake(6, 0.2);
+      for (var dr = -1; dr <= 1; dr++) for (var dc = -1; dc <= 1; dc++) {
+        var rr = b[0] + dr, cc = b[1] + dc;
+        if (rr < 0 || cc < 0 || rr >= N || cc >= N || m[rr][cc]) continue;
+        m[rr][cc] = true;
+        if (grid[rr][cc].special === 'bomb') q.push([rr, cc]);
+      }
+    }
+    for (r = 0; r < N; r++) for (c = 0; c < N; c++) if (m[r][c]) {
+      var g0 = grid[r][c];
+      n++; cx += c; cy += r;
+      if (g0.ice) { g0.ice = false; GG.burst(bx + (c + 0.5) * cell, by + (r + 0.5) * cell, { n: 6, colors: ['#bfefff', '#ffffff'], size: cell * 0.14, speed: 220 }); continue; }
+      if (makeBomb && r === makeBomb[0] && c === makeBomb[1]) { g0.special = 'bomb'; continue; }
+      if (g0.special === 'clock') { timeLeft = Math.min(totalT + 30, timeLeft + 5); GG.floatText(bx + (c + 0.5) * cell, by + (r + 0.5) * cell - cell, '+5 秒', '#9fe3ff', 28); }
+      g0.dying = true;
       GG.burst(bx + (c + 0.5) * cell, by + (r + 0.5) * cell, { n: 3, img: '_star', size: cell * 0.3, speed: 200, life: 0.5 });
     }
     combo++;
     var pts = n * 10 * combo;
     score += pts; GG.setScore(score);
+    var LA = LV_AT[lvl] * [1, 1.2, 1.4][d0];
+    if (lvl < LV_AT.length && score >= LA) {
+      lvl++; GG.banner('第 ' + lvl + ' 關', LV_MSG[lvl - 1]);
+      if (lvl === 3) freeze(6);
+      if (lvl === 5) TYPES = Math.min(6, TYPES + 1);
+    }
     GG.floatText(bx + (cx / n + 0.5) * cell, by + (cy / n + 0.5) * cell, '+' + pts + (combo > 1 ? ' 連擊x' + combo : ''), '#ffe14d', 30);
     if (n >= 4) { timeLeft = Math.min(totalT, timeLeft + (n - 3) * 3); GG.shake(4, 0.15); }
     GG.sfx(combo > 1 ? 'clear' : 'pop');
@@ -90,6 +136,9 @@
     return r < 0 || c < 0 || r >= N || c >= N ? null : [r, c];
   }
 
+  // 測試用：直接跳到第 n 關（截圖檢查用）
+  GG.testLevel = function (n) { lvl = n; if (n >= 3) freeze(6); };
+
   GG.define({
     assets: ASSETS,
     start: function (d) {
@@ -97,7 +146,7 @@
       TYPES = d === 2 ? 6 : 5;
       N = d === 0 ? 7 : 8;
       totalT = [150, 120, 90][d];
-      timeLeft = totalT; score = 0; combo = 0; sel = null; hint = null; hintT = 0;
+      timeLeft = totalT; score = 0; combo = 0; sel = null; hint = null; hintT = 0; lvl = 1; swapA = swapB = null;
       this.resize(GG.W, GG.H);
       fill(); phase = 'fall';
       GG.setScore(0);
@@ -168,7 +217,7 @@
       ctx.fillStyle = p > 0.3 ? '#43d17a' : (p > 0.15 ? '#ffb300' : '#ff5252');
       GG.rr(ctx, tx, ty, Math.max(28, tw * p), 28, 14); ctx.fill();
       ctx.lineWidth = 3; ctx.strokeStyle = GG.INK; GG.rr(ctx, tx, ty, tw, 28, 14); ctx.stroke();
-      GG.text(ctx, Math.ceil(timeLeft) + ' 秒', w / 2, ty + 14, 17, '#fff', 'center', true);
+      GG.text(ctx, Math.ceil(timeLeft) + ' 秒・第 ' + lvl + ' 關', w / 2, ty + 14, 18, '#fff', 'center', true);
       if (sel) GG.spr(ctx, 'sel', bx + (sel[1] + 0.5) * cell, by + (sel[0] + 0.5) * cell, cell * 1.05, cell * 1.05);
       ctx.save();
       ctx.beginPath(); ctx.rect(bx, by, bs, bs); ctx.clip();
@@ -186,7 +235,21 @@
         var sc = Math.max(0, g.scale) * 0.86;
         if (hint && ((hint[0][0] === r && hint[0][1] === c) || (hint[1][0] === r && hint[1][1] === c))) sc *= pulse;
         var s = cell * sc;
-        if (s > 0.5) ctx.drawImage(GG.img['g' + g.t], bx + (x + 0.5) * cell - s / 2, by + (y + 0.5) * cell - s / 2, s, s);
+        if (s > 0.5) {
+          var gx = bx + (x + 0.5) * cell, gy = by + (y + 0.5) * cell;
+          ctx.drawImage(GG.img['g' + g.t], gx - s / 2, gy - s / 2, s, s);
+          if (g.special === 'bomb') GG.spr(ctx, 'bomb', gx + s * 0.18, gy + s * 0.18, s * 0.55, s * 0.55);
+          else if (g.special === 'clock') {
+            ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(gx + s * 0.25, gy + s * 0.25, s * 0.22, 0, Math.PI * 2); ctx.fill();
+            ctx.lineWidth = 3; ctx.strokeStyle = '#3d8bfd'; ctx.stroke();
+            ctx.strokeStyle = GG.INK; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(gx + s * 0.25, gy + s * 0.25); ctx.lineTo(gx + s * 0.25, gy + s * 0.1); ctx.moveTo(gx + s * 0.25, gy + s * 0.25); ctx.lineTo(gx + s * 0.36, gy + s * 0.28); ctx.stroke();
+          }
+          if (g.ice) {
+            ctx.fillStyle = 'rgba(190,235,255,0.6)'; GG.rr(ctx, gx - cell * 0.46, gy - cell * 0.46, cell * 0.92, cell * 0.92, cell * 0.14); ctx.fill();
+            ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(gx - cell * 0.3, gy - cell * 0.1); ctx.lineTo(gx - cell * 0.1, gy - cell * 0.3); ctx.stroke();
+          }
+        }
       }
       ctx.restore();
     },

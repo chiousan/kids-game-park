@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="遊戲樂園">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#1b1446">
+<meta name="theme-color" content="#6cd3ff">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-180.png">
 <link rel="manifest" href="manifest.webmanifest">
@@ -16,13 +16,13 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body class="home-page">
-<div class="sky" aria-hidden="true">
-  <img class="star s1" src="assets/run/star.png" alt=""><img class="star s2" src="assets/run/star.png" alt=""><img class="star s3" src="assets/run/star.png" alt=""><img class="star s4" src="assets/run/star.png" alt="">
-</div>
+<div class="sky" aria-hidden="true"><i class="cloud k1"></i><i class="cloud k2"></i><i class="cloud k3"></i></div>
 <header class="hero">
-  <img class="logo" src="assets/bunny/bunny1_stand.png" alt="">
-  <h1>小小遊戲樂園</h1>
-  <p class="tag">沒有廣告・不用網路・安心玩</p>
+  <img class="logo" src="assets/bunny/hero_stand.png" alt="">
+  <div class="hero-text">
+    <h1>小小遊戲樂園</h1>
+    <p class="tag">沒有廣告・不用網路・安心玩</p>
+  </div>
 </header>
 
 <nav id="cats" class="cats"></nav>
@@ -54,9 +54,11 @@
     cats.innerHTML = '';
     GG.CATS.forEach(function (c) {
       var b = document.createElement('button');
+      var col = c.id === 'all' ? '#ff5c8a' : c.color;
       b.className = 'cat' + (c.id === cur ? ' on' : '');
+      if (c.id === cur) b.style.background = col;
       var dot = document.createElement('span');
-      dot.className = 'dot'; dot.style.background = c.color;
+      dot.className = 'dot'; dot.style.background = col;
       b.appendChild(dot);
       b.appendChild(document.createTextNode(c.name));
       b.addEventListener('click', function () {
@@ -67,21 +69,27 @@
       cats.appendChild(b);
     });
     grid.innerHTML = '';
-    GG.GAMES.forEach(function (g, i) {
+    var n = 0;
+    GG.GAMES.forEach(function (g) {
       if (cur !== 'all' && g.cat !== cur) return;
       var a = document.createElement('a');
-      a.className = 'tile';
+      // 大格（2x2）與寬格（2x1）穿插：22 款剛好排滿 4 欄或 6 欄，不留空洞
+      var size = cur !== 'all' ? (n === 0 ? ' big' : '') : [0, 6, 12, 17].indexOf(n) >= 0 ? ' big' : [1, 18].indexOf(n) >= 0 ? ' wide' : '';
+      a.className = 'tile' + size;
       a.href = 'game.html?g=' + g.id;
-      a.style.background = 'linear-gradient(145deg,' + g.c1 + ',' + g.c2 + ')';
-      a.style.animationDelay = (i * 0.03) + 's';
-      var e = document.createElement('img'); e.className = 'tile-icon'; e.src = 'assets/icons/' + g.id + '.png'; e.alt = '';
-      var n = document.createElement('div'); n.className = 'tile-name'; n.textContent = g.name;
-      var d = document.createElement('div'); d.className = 'tile-desc'; d.textContent = g.desc;
-      a.appendChild(e); a.appendChild(n); a.appendChild(d);
-      if (g.cat === 'duo') {
-        var t = document.createElement('span'); t.className = 'badge'; t.textContent = '雙人'; a.appendChild(t);
+      a.style.animationDelay = (n * 0.03) + 's';
+      n++;
+      var e = document.createElement('img'); e.className = 'tile-img'; e.src = 'assets/covers/' + g.id + '.jpg'; e.alt = '';
+      var nm = document.createElement('div'); nm.className = 'tile-name'; nm.textContent = g.name;
+      var d = document.createElement('span'); d.className = 'tile-desc'; d.textContent = g.desc;
+      nm.appendChild(d);
+      a.appendChild(e); a.appendChild(nm);
+      if (g.players) {
+        var pb = document.createElement('span'); pb.className = 'badge duo'; pb.textContent = g.players; a.appendChild(pb);
+      } else if (g.cat === 'duo') {
+        var t = document.createElement('span'); t.className = 'badge duo'; t.textContent = '雙人'; a.appendChild(t);
       } else if (played(g.id)) {
-        var p = document.createElement('span'); p.className = 'badge'; p.textContent = '玩過'; a.appendChild(p);
+        var p = document.createElement('span'); p.className = 'badge done'; p.textContent = '玩過'; a.appendChild(p);
       }
       grid.appendChild(a);
     });

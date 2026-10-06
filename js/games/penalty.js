@@ -31,12 +31,33 @@
       g.stroke();
     });
   }
+  /* 關卡：第 4 球起有角落金星（射中加 5 分）、第 7 球起有人牆、第 9 球起人牆會移動、守門員變大 */
+  var LV_MSG = ['', '新獎勵：射中角落的金星 +5 分', '新障礙：人牆（低球會被擋住）', '人牆會移動、守門員變大了！'];
+  var lvl = 1, bonus = 0, star = null, wall = null;
   function resetKick() {
     phase = 'aim'; shot = null;
-    keeper = { x: W / 2, tx: W / 2, ty: goal.y + goal.h * 0.62, dive: 0, dir: 0, react: 0, sizeW: goal.w * 0.2 };
+    var nl = shots < 3 ? 1 : shots < 6 ? 2 : shots < 8 ? 3 : 4;
+    if (nl > lvl) { lvl = nl; GG.banner('第 ' + lvl + ' 關', LV_MSG[lvl - 1]); }
+    keeper = { x: W / 2, tx: W / 2, ty: goal.y + goal.h * 0.62, dive: 0, dir: 0, react: 0, sizeW: goal.w * 0.2 * (lvl >= 4 ? 1.12 : 1) };
+    star = lvl >= 2 ? { x: Math.random() < 0.5 ? goal.x + ballR * 1.6 : goal.x + goal.w - ballR * 1.6, y: goal.y + ballR * 1.5, r: ballR * 1.5 } : null;
+    wall = lvl >= 3 ? { x0: goal.x + goal.w * GG.rand(0.3, 0.7), x: 0, w: goal.w * 0.28, mv: lvl >= 4 } : null;
+    if (wall) wall.x = wall.x0;
   }
-  function kick(dx, dy) {
-    var up = Math.max(0, -dy), tx = spot.x + dx * 1.9, ty = goal.y + goal.h - (up - 60) * 0.8;
+  function wallTop() { return goal.y + goal.h * 0.55; }
+  /* 落點：手指放開的位置就是射門的位置；在球門線下方就放開（短滑）時，順著滑動方向延伸到球門 */
+  function aimPoint(sx, sy, ex, ey) {
+    var gy0 = goal.y + goal.h, dx = ex - sx, dy = ey - sy;
+    if (dy > -30) return null;
+    var tx, ty;
+    if (ey <= gy0) { tx = ex; ty = ey; }
+    else { var k = (spot.y - (goal.y + goal.h * 0.5)) / -dy; tx = spot.x + dx * k; ty = goal.y + goal.h * 0.5; }
+    // 稍微超出一點點還是算在框內（對小朋友寬鬆），超出很多才是射偏
+    var mx = ballR * 1.2;
+    if (tx > goal.x - mx && tx < goal.x + goal.w + mx) tx = GG.clamp(tx, goal.x + ballR * 0.6, goal.x + goal.w - ballR * 0.6);
+    if (ty > goal.y - mx && ty < gy0) ty = GG.clamp(ty, goal.y + ballR * 0.6, gy0 - ballR * 0.5);
+    return { x: tx, y: ty };
+  }
+  function kick(tx, ty) {
     shot = { sx: spot.x, sy: spot.y, tx: tx, ty: ty, t: 0, dur: 0.55 };
     phase = 'fly'; GG.sfx('shoot');
     var guessRight = Math.random() < [0.25, 0.45, 0.65][d0];
@@ -53,22 +74,28 @@
     if (kind === 'goal') {
       goals++; msg = '進球！'; GG.sfx('goal'); GG.shake(6, 0.2);
       GG.burst(shot.tx, shot.ty, { n: 22, img: '_star', size: 26, speed: 380 });
+      if (star && GG.dist(shot.tx, shot.ty, star.x, star.y) < star.r * 1.2) { bonus += 5; msg = '進球！金星 +5'; GG.sfx('coin'); }
     } else if (kind === 'save') { msg = '被撲掉了！'; GG.sfx('hit'); }
+    else if (kind === 'wall') { msg = '被人牆擋住了！'; GG.sfx('hit'); }
     else { msg = '射偏了！'; GG.sfx('lose'); }
     GG.hud('進球 ' + goals + ' / ' + shots);
   }
 
+  // 測試用：直接跳到第 n 關（截圖檢查用）
+  GG.testLevel = function (n) { shots = [0, 3, 6, 8][Math.min(n, 4) - 1]; history = new Array(shots).fill(true); goals = shots; resetKick(); };
+
   GG.define({
-    assets: { ball: 'sport/soccer', k: 'blob/keeper', k_dizzy: 'blob/keeper_dizzy', k_smile: 'blob/keeper_smile', hills: 'run/background_color_hills' },
+    assets: { ball: 'sport/soccer', k: 'blob/keeper', k_dizzy: 'blob/keeper_dizzy', k_smile: 'blob/keeper_smile', hills: 'run/background_color_hills', wallBlob: 'blob/blue_happy' },
     start: function (d) {
       d0 = d; layout();
-      shots = 0; goals = 0; history = []; t = 0;
+      shots = 0; goals = 0; history = []; t = 0; lvl = 1; bonus = 0;
       resetKick();
       GG.hud('進球 0 / 0');
     },
     resize: function () { layout(); if (keeper && phase !== 'fly') resetKick(); },
     update: function (dt) {
       t += dt;
+      if (wall && wall.mv && phase === 'aim') wall.x = GG.clamp(wall.x0 + Math.sin(t * 1.5) * goal.w * 0.2, goal.x + wall.w / 2, goal.x + goal.w - wall.w / 2);
       if (phase === 'aim') { keeper.x = W / 2 + Math.sin(t * 2) * goal.w * 0.08; return; }
       if (phase === 'fly') {
         shot.t += dt / shot.dur;
@@ -84,20 +111,22 @@
           var inGoal = shot.tx > goal.x + ballR * 0.3 && shot.tx < goal.x + goal.w - ballR * 0.3 && shot.ty > goal.y + ballR * 0.3 && shot.ty < goal.y + goal.h;
           var kcy = GG.lerp(goal.y + goal.h * 0.62, keeper.ty, keeper.dive);
           var saved = Math.abs(shot.tx - keeper.x) < keeper.sizeW * (0.5 + keeper.dive * 0.4) && Math.abs(shot.ty - kcy) < goal.h * 0.45;
-          result(!inGoal ? 'miss' : saved ? 'save' : 'goal');
+          var walled = wall && inGoal && Math.abs(shot.tx - wall.x) < wall.w / 2 && shot.ty > wallTop();
+          result(!inGoal ? 'miss' : walled ? 'wall' : saved ? 'save' : 'goal');
         }
         return;
       }
       if (phase === 'result') {
         msgT += dt;
         if (msgT > 1.4) {
-          if (shots >= TOTAL) GG.over({ score: goals, win: goals >= 5, stars: GG.starsFor(goals, 4, 6, 8), title: goals >= 7 ? '射門大師！' : goals >= 5 ? '表現不錯！' : '再接再厲！', scoreText: '10 球進了 ' + goals + ' 球', delay: 200 });
+          if (shots >= TOTAL) GG.over({ score: goals * 10 + bonus, win: goals >= 5, stars: GG.starsFor(goals, 4, 6, 8), title: goals >= 7 ? '射門大師！' : goals >= 5 ? '表現不錯！' : '再接再厲！', scoreText: '10 球進了 ' + goals + ' 球' + (bonus ? '（金星 +' + bonus + '）' : ''), delay: 200 });
           else resetKick();
         }
       }
     },
     draw: function (ctx, w, h) {
       var gy0 = goal.y + goal.h, kw = keeper.sizeW * 1.6;
+      if (star) GG.spr(ctx, '_star', star.x, star.y, star.r * 2 * (1 + Math.sin(t * 5) * 0.08), star.r * 2 * (1 + Math.sin(t * 5) * 0.08), { alpha: 0.9 });
       var ky = GG.lerp(goal.y + goal.h * 0.62, keeper.ty, keeper.dive);
       var key = phase === 'result' ? (msg === '進球！' ? 'k_dizzy' : msg === '被撲掉了！' ? 'k_smile' : 'k') : 'k';
       var hop = phase === 'aim' ? Math.abs(Math.sin(t * 4)) * 8 : 0;
@@ -107,6 +136,11 @@
       ctx.beginPath(); ctx.moveTo(goal.x, gy0); ctx.lineTo(goal.x, goal.y); ctx.lineTo(goal.x + goal.w, goal.y); ctx.lineTo(goal.x + goal.w, gy0); ctx.stroke();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 10;
       ctx.beginPath(); ctx.moveTo(goal.x, gy0); ctx.lineTo(goal.x, goal.y); ctx.lineTo(goal.x + goal.w, goal.y); ctx.lineTo(goal.x + goal.w, gy0); ctx.stroke();
+      if (wall) {
+        // 人牆：三隻圓滾滾站在球門前
+        var wh = gy0 - wallTop(), bwid = wall.w / 3;
+        for (var q = 0; q < 3; q++) GG.spr(ctx, 'wallBlob', wall.x - wall.w / 2 + bwid * (q + 0.5), gy0 - wh * 0.5, bwid * 1.15, wh);
+      }
       var bxp = spot.x, byp = spot.y, sc = 1;
       if (shot) {
         var k = GG.ease(Math.min(1, shot.t));
@@ -117,6 +151,14 @@
         ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 6; ctx.setLineDash([10, 10]);
         ctx.beginPath(); ctx.moveTo(swipe.x, swipe.y); ctx.lineTo(swipe.cur.x, swipe.cur.y); ctx.stroke();
         ctx.setLineDash([]);
+        // 準星：顯示球會飛到哪裡
+        var ap = aimPoint(swipe.x, swipe.y, swipe.cur.x, swipe.cur.y);
+        if (ap) {
+          var ok = ap.x > goal.x && ap.x < goal.x + goal.w && ap.y > goal.y && ap.y < goal.y + goal.h;
+          ctx.strokeStyle = ok ? '#ffe14d' : '#ff6b6b'; ctx.lineWidth = 5;
+          ctx.beginPath(); ctx.arc(ap.x, ap.y, ballR * 0.8, 0, Math.PI * 2); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(ap.x - ballR * 1.1, ap.y); ctx.lineTo(ap.x + ballR * 1.1, ap.y); ctx.moveTo(ap.x, ap.y - ballR * 1.1); ctx.lineTo(ap.x, ap.y + ballR * 1.1); ctx.stroke();
+        }
       }
       var dotR = Math.min(16, w / 40), sx = (w - TOTAL * dotR * 2.8) / 2 + dotR * 1.4;
       for (var n = 0; n < TOTAL; n++) {
@@ -125,16 +167,17 @@
         ctx.lineWidth = 3; ctx.strokeStyle = GG.INK; ctx.stroke();
       }
       if (phase === 'result') GG.text(ctx, msg, w / 2, h * 0.58, 54, msg === '進球！' ? '#ffe14d' : '#fff', 'center', true, 1 + Math.max(0, 0.3 - msgT));
-      if (phase === 'aim' && shots === 0 && !swipe) GG.text(ctx, '從球往球門滑動射門！', w / 2, h * 0.66, 26, '#fff', 'center', true);
     },
+    hintAt: function () { return phase === 'aim' && shots === 0 ? { x: spot.x, y: spot.y, dx: 1, dy: -(spot.y - goal.y - goal.h * 0.3) / GG.clamp(Math.min(W, H) * 0.13, 64, 110), tip: '從球滑到球門角落，放開射門！', ty: goal.y + goal.h + 34 } : false; },
     down: function (p) { if (phase === 'aim') swipe = { x: p.x, y: p.y, cur: p }; },
     move: function (p) { if (swipe) swipe.cur = p; },
     up: function (p) {
       if (!swipe || phase !== 'aim') { swipe = null; return; }
-      var dx = p.x - swipe.x, dy = p.y - swipe.y;
+      var a = aimPoint(swipe.x, swipe.y, p.x, p.y), tap = Math.abs(p.x - swipe.x) < 16 && Math.abs(p.y - swipe.y) < 16;
       swipe = null;
-      if (dy > -50) return;
-      kick(dx, dy);
+      if (a) kick(a.x, a.y);
+      // 年紀小的直接點球門也可以射門
+      else if (tap && p.x > goal.x && p.x < goal.x + goal.w && p.y > goal.y && p.y < goal.y + goal.h) kick(p.x, GG.clamp(p.y, goal.y + ballR * 0.6, goal.y + goal.h - ballR * 0.5));
     }
   });
 })();
