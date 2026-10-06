@@ -1,7 +1,38 @@
-/* 離線快取：第一次開啟後，沒有網路也能玩（版本號由內容自動產生） */
-var CACHE = 'gg-e2fb13afa1';
-var FILES = [
+/* 離線快取（版本號由內容自動產生）：核心檔安裝時快取，其餘檔案啟用後在背景補抓 */
+var CACHE = 'gg-a6d84a014d';
+var CORE = [
   './',
+  'css/style.css',
+  'game.html',
+  'index.html',
+  'js/engine.js',
+  'js/games.js',
+  'js/games/blocks.js',
+  'js/games/breakout.js',
+  'js/games/bubble.js',
+  'js/games/connect4.js',
+  'js/games/fishing.js',
+  'js/games/flappy.js',
+  'js/games/g2048.js',
+  'js/games/gems.js',
+  'js/games/gomoku.js',
+  'js/games/hockey.js',
+  'js/games/hoops.js',
+  'js/games/jumper.js',
+  'js/games/memory.js',
+  'js/games/mines.js',
+  'js/games/penalty.js',
+  'js/games/racer.js',
+  'js/games/runner.js',
+  'js/games/snake.js',
+  'js/games/space.js',
+  'js/games/stairs.js',
+  'js/games/tanks.js',
+  'js/games/whack.js',
+  'js/sw-register.js',
+  'manifest.webmanifest'
+];
+var FILES = [
   'assets/animals/bear.png',
   'assets/animals/chick.png',
   'assets/animals/chicken.png',
@@ -282,49 +313,50 @@ var FILES = [
   'assets/ui/heart.png',
   'assets/ui/heart_empty.png',
   'assets/ui/star.png',
-  'css/style.css',
-  'game.html',
   'icon-180.png',
-  'icon-512.png',
-  'index.html',
-  'js/engine.js',
-  'js/games.js',
-  'js/games/blocks.js',
-  'js/games/breakout.js',
-  'js/games/bubble.js',
-  'js/games/connect4.js',
-  'js/games/fishing.js',
-  'js/games/flappy.js',
-  'js/games/g2048.js',
-  'js/games/gems.js',
-  'js/games/gomoku.js',
-  'js/games/hockey.js',
-  'js/games/hoops.js',
-  'js/games/jumper.js',
-  'js/games/memory.js',
-  'js/games/mines.js',
-  'js/games/penalty.js',
-  'js/games/racer.js',
-  'js/games/runner.js',
-  'js/games/snake.js',
-  'js/games/space.js',
-  'js/games/stairs.js',
-  'js/games/tanks.js',
-  'js/games/whack.js',
-  'js/sw-register.js',
-  'manifest.webmanifest'
+  'icon-512.png'
 ];
 self.addEventListener('install', function (e) {
-  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
+  e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
 });
+function fillRest() {
+  // 一個一個慢慢抓，失敗的下次再補，不影響使用
+  return caches.open(CACHE).then(function (c) {
+    var i = 0;
+    function next() {
+      if (i >= FILES.length) return null;
+      var f = FILES[i++];
+      return c.match(f).then(function (hit) {
+        if (hit) return null;
+        return fetch(f).then(function (r) { if (r.ok) return c.put(f, r); }).catch(function () {});
+      }).then(next);
+    }
+    return next();
+  });
+}
 self.addEventListener('activate', function (e) {
   e.waitUntil(caches.keys().then(function (keys) {
     return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
   }).then(function () { return self.clients.claim(); }));
+  fillRest();
 });
 self.addEventListener('fetch', function (e) {
-  if (e.request.method !== 'GET') return;
-  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(function (r) {
-    return r || fetch(e.request);
+  var req = e.request;
+  if (req.method !== 'GET' || req.url.indexOf(self.location.origin) !== 0) return;
+  var code = req.mode === 'navigate' || /\.(html|js|css|webmanifest)(\?|$)/.test(req.url);
+  if (code) {
+    // 網頁與程式：先抓網路（拿最新版），沒網路才用快取
+    e.respondWith(fetch(req).then(function (r) {
+      if (r.ok) { var copy = r.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
+      return r;
+    }).catch(function () { return caches.match(req, { ignoreSearch: true }); }));
+    return;
+  }
+  // 圖片：先用快取，沒有才抓網路並存起來
+  e.respondWith(caches.match(req, { ignoreSearch: true }).then(function (hit) {
+    return hit || fetch(req).then(function (r) {
+      if (r.ok) { var copy = r.clone(); caches.open(CACHE).then(function (c) { c.put(req, copy); }); }
+      return r;
+    });
   }));
 });
