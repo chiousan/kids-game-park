@@ -1,5 +1,5 @@
 /* 離線快取（版本號由內容自動產生）：核心檔安裝時快取，其餘檔案啟用後在背景補抓 */
-var CACHE = 'gg-a6d84a014d';
+var CACHE = 'gg-10ab771f5e';
 var CORE = [
   './',
   'css/style.css',

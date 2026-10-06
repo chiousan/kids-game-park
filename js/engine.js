@@ -447,12 +447,16 @@
       if (b.label) GG.text(ctx, b.label, lx, b.y + b.h / 2 + sink, b.fs || Math.min(b.w, b.h) * 0.36, fg);
     }
   }
-  /* 關卡橫幅：「第 N 關」＋這一關新出現的東西（新障礙／新獎勵），顯示約 2.4 秒 */
-  var banner = null;
-  GG.banner = function (title, sub, color) { banner = { t: 0, title: title, sub: sub || '', color: color || '#ffe14d' }; GG.sfx('power'); };
+  /* 關卡橫幅：「第 N 關」＋這一關新出現的東西（新障礙／新獎勵）。
+     升關時整個遊戲先停 3 秒（倒數 3、2、1），讓小朋友看清楚再繼續 */
+  var LEVEL_PAUSE = 3, banner = null, pauseT = 0;
+  GG.banner = function (title, sub, color) {
+    banner = { t: 0, title: title, sub: sub || '', color: color || '#ffe14d' };
+    pauseT = LEVEL_PAUSE; GG.sfx('power');
+  };
   function drawBanner() {
     if (!banner) return;
-    var k = banner.t, a = k < 0.25 ? k / 0.25 : k > 2.1 ? Math.max(0, (2.4 - k) / 0.3) : 1;
+    var k = banner.t, a = k < 0.25 ? k / 0.25 : k > LEVEL_PAUSE ? Math.max(0, (LEVEL_PAUSE + 0.4 - k) / 0.4) : 1;
     var y = H * 0.3, bh = banner.sub ? 104 : 74, sc = k < 0.25 ? GG.back(k / 0.25) : 1;
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(20,16,50,0.62)';
@@ -460,6 +464,11 @@
     ctx.fillStyle = banner.color; ctx.fillRect(0, y - bh / 2, W, 5); ctx.fillRect(0, y + bh / 2 - 5, W, 5);
     GG.text(ctx, banner.title, W / 2, y - (banner.sub ? 16 : 0), 42, banner.color, 'center', true, sc);
     if (banner.sub) GG.text(ctx, banner.sub, W / 2, y + 28, 24, '#ffffff', 'center', true);
+    if (pauseT > 0) {
+      var n = Math.ceil(pauseT), f = pauseT - Math.floor(pauseT);
+      ctx.fillStyle = 'rgba(20,16,50,0.55)'; ctx.beginPath(); ctx.arc(W / 2, y + bh / 2 + 52, 38, 0, Math.PI * 2); ctx.fill();
+      GG.text(ctx, String(n), W / 2, y + bh / 2 + 52, 46, '#ffffff', 'center', true, 0.85 + f * 0.3);
+    }
     ctx.globalAlpha = 1;
   }
   /* 開局操作示範：依操作類型畫手套動畫，第一次碰畫面就消失。
@@ -520,9 +529,18 @@
       var dt = raw > 0.05 ? 0.05 : raw < 0 ? 0 : raw;
       var changed = false;
       if (state === 'play') {
-        changed = game.update(dt) !== false || !game.lazy;
-        if (hintActive()) { hintT += dt; changed = true; }
-        if (banner) { banner.t += dt; changed = true; if (banner.t > 2.4) banner = null; }
+        if (pauseT > 0) {
+          // 升關暫停：遊戲本身不更新，只跑倒數
+          var pb = Math.ceil(pauseT);
+          pauseT -= dt;
+          if (pauseT > 0 && Math.ceil(pauseT) !== pb) GG.sfx('tick');
+          if (pauseT <= 0) { pauseT = 0; GG.sfx('go'); }
+          changed = true;
+        } else {
+          changed = game.update(dt) !== false || !game.lazy;
+          if (hintActive()) { hintT += dt; changed = true; }
+        }
+        if (banner) { banner.t += dt; changed = true; if (banner.t > LEVEL_PAUSE + 0.4) banner = null; }
         // 量測順暢度：持續低於約 45fps 就降畫質
         if (perf.skip > 0) perf.skip--;
         else if (raw < 0.2) {
@@ -621,18 +639,19 @@
         if (b.down && b.stick) continue; // 這支搖桿已經有別的手指在用
         b.down = true; owners[p.id] = b; hintOff = true;
         if (b.stick) stickSet(b, p);
-        if (b.onDown) b.onDown(p);
+        if (b.onDown && pauseT <= 0) b.onDown(p); // 升關暫停時按了不算
         return;
       }
     }
+    if (pauseT > 0) { owners[p.id] = 'skip'; return; }
     owners[p.id] = 'game';
     hintOff = true;
     if (game.down) game.down(p);
   }
   function onMove(p) {
     var o = owners[p.id];
-    if (!o || state !== 'play') return;
-    if (o === 'game') { if (game.move) game.move(p); }
+    if (!o || o === 'skip' || state !== 'play') return;
+    if (o === 'game') { if (pauseT <= 0 && game.move) game.move(p); }
     else {
       if (o.stick) { stickSet(o, p); needDraw = true; }
       if (o.onMove) o.onMove(p);
@@ -641,9 +660,9 @@
   function onUp(p) {
     var o = owners[p.id];
     delete owners[p.id];
-    if (!o || state !== 'play') return;
+    if (!o || o === 'skip' || state !== 'play') return;
     needDraw = true;
-    if (o === 'game') { if (game.up) game.up(p); }
+    if (o === 'game') { if (pauseT <= 0 && game.up) game.up(p); }
     else { o.down = false; if (o.stick) stickSet(o, null); if (o.onUp) o.onUp(p); }
   }
   function bindInput() {
@@ -669,7 +688,7 @@
       if (state !== 'play') return;
       needDraw = true;
       hintOff = true;
-      if (!GG.keys[e.key] && game.key) game.key(e.key);
+      if (!GG.keys[e.key] && game.key && pauseT <= 0) game.key(e.key);
       GG.keys[e.key] = true;
     });
     window.addEventListener('keyup', function (e) { GG.keys[e.key] = false; });
@@ -846,7 +865,7 @@
     hideMenu(); releaseAll();
     parts = [];
     game.start(v);
-    started = true; hintT = 0; hintOff = false; banner = null;
+    started = true; hintT = 0; hintOff = false; banner = null; pauseT = 0;
     if (game.countdown) { state = 'count'; countT = 3; }
     else state = 'play';
     last = performance.now();
