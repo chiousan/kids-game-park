@@ -1,4 +1,4 @@
-/* 點球大戰：滑動射門，騙過圓滾滾守門員 */
+/* 點球大戰：滑動射門，騙過企鵝守門員（第 4 關換成好多隻手的章魚） */
 (function () {
   var W, H, goal, spot, ballR, shots, goals, phase, shot, keeper, msg, msgT, swipe, d0, history, t;
   var TOTAL = 10;
@@ -32,16 +32,17 @@
     });
   }
   /* 關卡：第 4 球起有角落金星（射中加 5 分）、第 7 球起有人牆、第 9 球起人牆會移動、守門員變大 */
-  var LV_MSG = ['', '新獎勵：射中角落的金星 +5 分', '新障礙：人牆（低球會被擋住）', '人牆會移動、守門員變大了！'];
+  var LV_MSG = ['', '新獎勵：射中角落的金星 +5 分', '新障礙：小企鵝人牆（低球會被擋住）', '人牆會移動、章魚守門員上場（好多隻手）！'];
   var lvl = 1, bonus = 0, star = null, wall = null;
   function resetKick() {
     phase = 'aim'; shot = null;
     var nl = shots < 3 ? 1 : shots < 6 ? 2 : shots < 8 ? 3 : 4;
     if (nl > lvl) { lvl = nl; GG.banner('第 ' + lvl + ' 關', LV_MSG[lvl - 1]); }
-    keeper = { x: W / 2, tx: W / 2, ty: goal.y + goal.h * 0.62, dive: 0, dir: 0, react: 0, sizeW: goal.w * 0.2 * (lvl >= 4 ? 1.12 : 1) };
+    keeper = { x: W / 2, tx: W / 2, ty: goal.y + goal.h * 0.62, dive: 0, dir: 0, react: 0, sizeW: goal.w * 0.2 * (lvl >= 4 ? 1.12 : 1),
+      anim: new GG.Anim(lvl >= 4 ? 'octopus' : 'penguin') };
     star = lvl >= 2 ? { x: Math.random() < 0.5 ? goal.x + ballR * 1.6 : goal.x + goal.w - ballR * 1.6, y: goal.y + ballR * 1.5, r: ballR * 1.5 } : null;
     wall = lvl >= 3 ? { x0: goal.x + goal.w * GG.rand(0.3, 0.7), x: 0, w: goal.w * 0.28, mv: lvl >= 4 } : null;
-    if (wall) wall.x = wall.x0;
+    if (wall) { wall.x = wall.x0; wall.pg = [0, 1, 2].map(function () { return new GG.Anim('penguinS'); }); }
   }
   function wallTop() { return goal.y + goal.h * 0.55; }
   /* 落點：手指放開的位置就是射門的位置；在球門線下方就放開（短滑）時，順著滑動方向延伸到球門 */
@@ -76,8 +77,13 @@
       GG.burst(shot.tx, shot.ty, { n: 22, img: '_star', size: 26, speed: 380 });
       if (star && GG.dist(shot.tx, shot.ty, star.x, star.y) < star.r * 1.2) { bonus += 5; msg = '進球！金星 +5'; GG.sfx('coin'); }
     } else if (kind === 'save') { msg = '被撲掉了！'; GG.sfx('hit'); }
-    else if (kind === 'wall') { msg = '被人牆擋住了！'; GG.sfx('hit'); }
+    else if (kind === 'wall') {
+      msg = '被人牆擋住了！'; GG.sfx('hit');
+      var wi = GG.clamp(Math.floor((shot.tx - (wall.x - wall.w / 2)) / (wall.w / 3)), 0, 2); wall.pg[wi].hit(1);
+    }
     else { msg = '射偏了！'; GG.sfx('lose'); }
+    // 守門員：被射進就頭暈、撲到就抱球開心
+    keeper.anim.set(kind === 'goal' ? 'dizzy' : kind === 'save' ? 'catch' : 'idle');
     GG.hud('進球 ' + goals + ' / ' + shots);
   }
 
@@ -85,7 +91,7 @@
   GG.testLevel = function (n) { shots = [0, 3, 6, 8][Math.min(n, 4) - 1]; history = new Array(shots).fill(true); goals = shots; resetKick(); };
 
   GG.define({
-    assets: { ball: 'sport/soccer', k: 'blob/keeper', k_dizzy: 'blob/keeper_dizzy', k_smile: 'blob/keeper_smile', hills: 'run/background_color_hills', wallBlob: 'blob/blue_happy' },
+    assets: GG.extend(GG.rigAssets(['penguin', 'penguinS', 'octopus']), { ball: 'sport/soccer', hills: 'run/background_color_hills' }),
     start: function (d) {
       d0 = d; layout();
       shots = 0; goals = 0; history = []; t = 0; lvl = 1; bonus = 0;
@@ -95,16 +101,20 @@
     resize: function () { layout(); if (keeper && phase !== 'fly') resetKick(); },
     update: function (dt) {
       t += dt;
+      keeper.anim.update(dt);
+      if (wall) wall.pg.forEach(function (a) { a.update(dt); });
       if (wall && wall.mv && phase === 'aim') wall.x = GG.clamp(wall.x0 + Math.sin(t * 1.5) * goal.w * 0.2, goal.x + wall.w / 2, goal.x + goal.w - wall.w / 2);
       if (phase === 'aim') { keeper.x = W / 2 + Math.sin(t * 2) * goal.w * 0.08; return; }
       if (phase === 'fly') {
         shot.t += dt / shot.dur;
         keeper.react -= dt;
+        if (keeper.react > 0) keeper.anim.set('ready');
         if (keeper.react <= 0) {
           var dx = keeper.tx - keeper.x, step = keeper.speed * dt;
           keeper.x = Math.abs(dx) <= step ? keeper.tx : keeper.x + step * (dx > 0 ? 1 : -1);
           keeper.dive = Math.min(1, keeper.dive + dt * 4);
           keeper.dir = keeper.tx < W / 2 - 5 ? -1 : keeper.tx > W / 2 + 5 ? 1 : 0;
+          keeper.anim.set(keeper.dir < 0 ? 'diveL' : keeper.dir > 0 ? 'diveR' : 'ready');
         }
         if (shot.t >= 1) {
           shot.t = 1;
@@ -128,18 +138,27 @@
       var gy0 = goal.y + goal.h, kw = keeper.sizeW * 1.6;
       if (star) GG.spr(ctx, '_star', star.x, star.y, star.r * 2 * (1 + Math.sin(t * 5) * 0.08), star.r * 2 * (1 + Math.sin(t * 5) * 0.08), { alpha: 0.9 });
       var ky = GG.lerp(goal.y + goal.h * 0.62, keeper.ty, keeper.dive);
-      var key = phase === 'result' ? (msg === '進球！' ? 'k_dizzy' : msg === '被撲掉了！' ? 'k_smile' : 'k') : 'k';
-      var hop = phase === 'aim' ? Math.abs(Math.sin(t * 4)) * 8 : 0;
-      GG.spr(ctx, key, keeper.x, ky - hop, kw, null, { rot: keeper.dir * keeper.dive * 0.9 });
+      var ka = keeper.anim, kh = kw * 0.95, oct = ka.rig.name === 'octopus';
+      if (oct) {
+        // 章魚：頭是部件圖，觸手即時畫（會像波浪一樣擺）
+        var os = kh * 0.85 / ka.rig.def.h, ox = keeper.x + ka.rig.root.x * os, oy = ky + kh * 0.05;
+        // 觸手只畫在球門框裡面
+        ctx.save(); ctx.beginPath(); ctx.rect(goal.x + 6, goal.y + 6, goal.w - 12, goal.h * 1.2); ctx.clip();
+        GG.drawTentacles(ctx, ox, oy, os, t, ka.mode);
+        ctx.restore();
+        ka.draw(ctx, keeper.x, oy, os, false);
+      } else {
+        ka.draw(ctx, keeper.x, ky + kh * 0.5, kh / ka.rig.def.h, false, { spin: keeper.dir * keeper.dive * 1.3 });
+      }
       ctx.lineCap = 'round';
       ctx.strokeStyle = GG.INK; ctx.lineWidth = 16;
       ctx.beginPath(); ctx.moveTo(goal.x, gy0); ctx.lineTo(goal.x, goal.y); ctx.lineTo(goal.x + goal.w, goal.y); ctx.lineTo(goal.x + goal.w, gy0); ctx.stroke();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 10;
       ctx.beginPath(); ctx.moveTo(goal.x, gy0); ctx.lineTo(goal.x, goal.y); ctx.lineTo(goal.x + goal.w, goal.y); ctx.lineTo(goal.x + goal.w, gy0); ctx.stroke();
       if (wall) {
-        // 人牆：三隻圓滾滾站在球門前
+        // 人牆：三隻小企鵝站在球門前，輪流晃動
         var wh = gy0 - wallTop(), bwid = wall.w / 3;
-        for (var q = 0; q < 3; q++) GG.spr(ctx, 'wallBlob', wall.x - wall.w / 2 + bwid * (q + 0.5), gy0 - wh * 0.5, bwid * 1.15, wh);
+        for (var q = 0; q < 3; q++) wall.pg[q].draw(ctx, wall.x - wall.w / 2 + bwid * (q + 0.5), gy0 + wh * 0.04, wh * 1.08 / wall.pg[q].rig.def.h, false);
       }
       var bxp = spot.x, byp = spot.y, sc = 1;
       if (shot) {

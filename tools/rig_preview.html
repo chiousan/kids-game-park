@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>動作預覽</title>
+<style>html,body{margin:0;background:#c4e8ff;font-family:"Microsoft JhengHei",sans-serif}canvas{display:block}</style></head>
+<body>
+<canvas id="c"></canvas>
+<script>window.GG = { img: {}, dpr: 1 };</script>
+<script src="../js/rigs.js"></script>
+<script src="../js/rig.js"></script>
+<script>
+/* 開發用：播放每隻角色的動作，給截圖做成 GIF。網址 ?set=bunny 或 ?set=others */
+var set = (location.search.match(/set=(\w+)/) || [])[1] || 'bunny';
+var cv = document.getElementById('c'), ctx = cv.getContext('2d');
+var CELLS = {
+  bunny: [
+    { label: '走路（雙腳交叉）', rig: 'bunny', seq: [['walk', 99]], s: 1, speed: 110 },
+    { label: '跑步', rig: 'bunny', seq: [['run', 99]], s: 1, speed: 190 },
+    { label: '先蹲再跳、落地壓扁', rig: 'bunny', seq: [['idle', 0.4], ['crouch', 0.1], ['jump', 0.35], ['fall', 0.35], ['land', 0.5]], s: 1 },
+    { label: '被打到、暈暈、開心', rig: 'bunny', seq: [['idle', 0.5], ['hurt', 0.8], ['dizzy', 1.0], ['cheer', 1.0]], s: 1 }
+  ],
+  others: [
+    { label: '地鼠：張望→被敲', rig: 'mole', seq: [['pop', 0.3], ['idle', 1.3], ['hurt', 0.9]], s: 0.8 },
+    { label: '金倉鼠', rig: 'hamster', kind: 'mole', seq: [['pop', 0.3], ['idle', 1.9]], s: 0.8 },
+    { label: '工地帽地鼠', rig: 'moleHat', kind: 'mole', seq: [['idle', 2.2]], s: 0.8 },
+    { label: '企鵝：晃→預備→撲球', rig: 'penguin', seq: [['idle', 0.8], ['ready', 0.4], ['diveL', 0.6], ['catch', 0.8]], s: 0.8 },
+    { label: '章魚守門員', rig: 'octopus', seq: [['idle', 1.2], ['diveR', 0.6], ['catch', 0.6]], s: 0.9 },
+    { label: '小企鵝人牆', rig: 'penguinS', seq: [['idle', 2.2]], s: 1 },
+    { label: '貓咪：甩竿→收線→開心', rig: 'cat', seq: [['idle', 0.5], ['cast', 0.5], ['reel', 0.7], ['happy', 0.8]], s: 0.8 },
+    { label: '刺蝟小碎步', rig: 'hedgehog', seq: [['walk', 99]], s: 1.3 },
+    { label: '青蛙：蹲→跳', rig: 'frog', seq: [['idle', 0.6], ['crouch', 0.15], ['jump', 0.5], ['land', 0.45]], s: 1.2 },
+    { label: '小鳥拍翅', rig: 'bird', seq: [['idle', 99]], s: 1.2 },
+    { label: '胖麻雀', rig: 'sparrow', seq: [['idle', 99]], s: 1.2 },
+    { label: '小蜜蜂', rig: 'bee', seq: [['idle', 99]], s: 1.2 }
+  ]
+};
+var cells = CELLS[set], COLS = set === 'bunny' ? 4 : 4, CW = 250, CH = set === 'bunny' ? 300 : 240;
+cv.width = COLS * CW; cv.height = Math.ceil(cells.length / COLS) * CH;
+cells.forEach(function (c) { c.anim = new GG.Anim(c.rig, c.kind || c.rig); c.t = 0; c.i = 0; c.y = 0; });
+var names = {}; cells.forEach(function (c) { names[c.rig] = 1; });
+var assets = GG.rigAssets(Object.keys(names)), keys = Object.keys(assets), left = keys.length;
+keys.forEach(function (k) { var im = new Image(); im.onload = function () { if (--left === 0) window.ready = true; }; im.src = '../assets/' + assets[k] + '.png'; GG.img[k] = im; });
+function stepCell(c, dt) {
+  c.t += dt;
+  var cur = c.seq[c.i];
+  if (c.t > cur[1]) { c.t = 0; c.i = (c.i + 1) % c.seq.length; cur = c.seq[c.i]; }
+  var m = cur[0], a = c.anim;
+  if (m === 'land') { if (c.t === 0 || a.mode !== 'idle') { a.land(); } a.set('idle'); }
+  else if (m === 'hurt') { if (a.mode !== 'hurt') { a.hit(1); } a.set('hurt'); }
+  else a.set(m);
+  // 跳躍高度：jump 往上、fall 往下
+  if (m === 'jump') c.y = -Math.sin(Math.min(1, c.t / cur[1]) * Math.PI / 2) * 70;
+  else if (m === 'fall') c.y = -Math.cos(Math.min(1, c.t / cur[1]) * Math.PI / 2) * 70;
+  else c.y = 0;
+  a.update(dt, c.speed || 0);
+}
+window.step = function (dt) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = '#c4e8ff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  cells.forEach(function (c, i) {
+    stepCell(c, dt);
+    var x0 = (i % COLS) * CW, y0 = Math.floor(i / COLS) * CH, gx = x0 + CW / 2, gy = y0 + CH - 46;
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillRect(x0 + 6, y0 + 6, CW - 12, CH - 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.beginPath(); ctx.ellipse(gx, gy + 2, 60 * c.s, 10, 0, 0, Math.PI * 2); ctx.fill();
+    if (c.rig === 'octopus') GG.drawTentacles(ctx, gx, gy - 2 + c.y, c.s, c.anim.t, c.anim.mode);
+    c.anim.draw(ctx, gx, gy + c.y, c.s, false);
+    ctx.fillStyle = '#3a3850'; ctx.font = 'bold 18px "Microsoft JhengHei"'; ctx.textAlign = 'center';
+    ctx.fillText(c.label, gx, y0 + CH - 16);
+  });
+  return true;
+};
+</script>
+</body></html>

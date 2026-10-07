@@ -1,17 +1,18 @@
-/* 泡泡龍：六角格泡泡，3 顆以上同色爆破，懸空的會掉下來 */
+/* 泡泡龍：六角格泡泡（每顆泡泡裡有一隻同色的小動物），3 顆以上同色爆破，懸空的會掉下來 */
 (function () {
   var ALL = ['blue', 'green', 'pink', 'purple', 'red', 'yellow'];
   var C = 10, grid, parity, colors, R, rowH, left, top, shooter, loseY, cur, nxt, shot, aim, pops, falls, score, shotsLeftRow, perRow, d0, dirty, over;
   var ASSETS = {};
-  ALL.forEach(function (c) { ASSETS[c] = 'blob/' + c + '_happy'; ASSETS[c + 'd'] = 'blob/' + c + '_dizzy'; });
-  ASSETS.bomb = 'run/bomb';
+  // 藍＝小藍鳥、綠＝青蛙、粉＝小豬、紫＝小章魚、紅＝瓢蟲、黃＝小雞；石頭泡泡＝縮進殼裡的小烏龜
+  ALL.forEach(function (c) { ASSETS[c] = 'animals/b_' + c; ASSETS[c + 'd'] = 'animals/b_' + c + '_d'; });
+  ASSETS.bomb = 'run/bomb'; ASSETS.stone = 'animals/b_stone';
   /* 清光一關就進下一關（共 5 關）：
      2 關彩虹泡泡（變成旁邊最多的顏色）、3 關石頭泡泡（打不破，只能讓它掉下來）、4 關炸彈泡泡（炸掉周圍）、5 關顏色更多、下降更快 */
   var STONE = 6, RAINBOW = 7, BOMB = 8;
-  var LV_MSG = ['', '新獎勵：彩虹泡泡（變成旁邊最多的顏色）', '新障礙：石頭泡泡（打不破，要讓它掉下來）', '新獎勵：炸彈泡泡（炸掉周圍一圈）', '顏色變多、下降更快了！'];
+  var LV_MSG = ['', '新獎勵：彩虹泡泡（變成旁邊最多的顏色）', '新障礙：烏龜泡泡（打不破，要讓它掉下來）', '新獎勵：炸彈泡泡（炸掉周圍一圈）', '顏色變多、下降更快了！'];
   var lvl = 1, stoneSpr = null, rainSpr = null;
   function bubbleImg(col, dizzy) {
-    if (col === STONE) return stoneSpr;
+    if (col === STONE) return 'stone';
     if (col === RAINBOW) return rainSpr;
     if (col === BOMB) return 'bomb';
     return ALL[col] + (dizzy ? 'd' : '');

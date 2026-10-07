@@ -13,7 +13,9 @@
   var SPEED = [0.09, 0.11, 0.125, 0.14, 0.155, 0.17, 0.19];
   var ASSETS = { grass: 'stairs/ground_grass_small', stone: 'stairs/ground_stone_small', wood: 'stairs/ground_wood_small',
     sand: 'stairs/ground_sand_small', sandBroken: 'stairs/ground_sand_small_broken', spring: 'bunny/spring', springOut: 'bunny/spring_out' };
-  for (var pi = 1; pi <= 4; pi++) ['stand', 'ready', 'jump', 'hurt'].forEach(function (k) { ASSETS['p' + pi + '_' + k] = 'stairs/p' + pi + '_' + k; });
+  for (var pi = 1; pi <= 4; pi++) ['stand', 'jump', 'hurt'].forEach(function (k) { ASSETS['p' + pi + '_' + k] = 'stairs/p' + pi + '_' + k; });
+  // 場上的兔兔用拆部件角色（側身、會走路、會壓扁），上方血條旁的頭像沿用正面圖
+  GG.extend(ASSETS, GG.rigAssets(['bunnyP1', 'bunnyP2', 'bunnyP3', 'bunnyP4']));
 
   function layout() {
     W = GG.W; H = GG.H;
@@ -85,14 +87,15 @@
   }
   function hurt(p, n, why) {
     if (p.star > 0 || p.hurtT > 0) return;
-    p.hp -= n; p.hurtT = 0.7;
+    p.hp -= n; p.hurtT = 0.7; p.anim.hit(-p.face);
     GG.sfx('hurt'); GG.shake(6, 0.2);
-    GG.floatText(p.x, p.y - BH * 1.2, '-' + n + (why ? ' ' + why : ''), '#ff6b6b', 24);
+    // 飄字不要飄進上方血條區
+    GG.floatText(p.x, Math.max(p.y - BH * 1.2, top + 80), '-' + n + (why ? ' ' + why : ''), '#ff6b6b', 24);
     if (p.hp <= 0) die(p);
   }
   function die(p) {
     if (p.dead) return;
-    p.dead = true; p.deadT = 0; p.plat = null; p.vy = -playH * 0.6; p.hp = Math.max(0, p.hp);
+    p.dead = true; p.deadT = 0; p.plat = null; p.vy = -playH * 0.6; p.hp = Math.max(0, p.hp); p.anim.set('dizzy');
     GG.sfx('lose');
     GG.burst(p.x, p.y - BH / 2, { n: 12, img: '_star', size: 20, speed: 260 });
     var alive = players.filter(function (q) { return !q.dead; });
@@ -109,7 +112,7 @@
       if (!best || Math.abs(q.x - p.x) < Math.abs(best.x - p.x)) best = q;
     });
     if (!best) { addPlat(top + playH * 0.45, 'normal', GG.clamp(p.x, PW / 2 + 16, W - PW / 2 - 16)); best = plats[plats.length - 1]; best.floor = p.floor; }
-    p.x = best.x; p.y = best.y; p.vy = 0; p.plat = best; p.last = best; p.hurtT = 1.5;
+    p.x = best.x; p.y = best.y; p.vy = 0; p.plat = best; p.last = best; p.hurtT = 1.5; p.anim.faceFor('x', 0.8); p.anim.land();
     GG.floatText(p.x, p.y - BH * 1.4, '-4 救回來了！', '#ff8a8a', 24);
   }
   function finish() {
@@ -152,7 +155,8 @@
       players = [];
       for (var i = 0; i < np; i++) {
         var px = W / 2 + (i - (np - 1) / 2) * Math.min(PW * 0.9, W * 0.8 / np);
-        players.push({ i: i, x: px, y: startY, vx: 0, vy: 0, hp: MAXHP, plat: plats[0], last: plats[0], dead: false, deadT: 0, floor: 0, face: 1, hurtT: 0, star: 0, spring: 0 });
+        players.push({ i: i, x: px, y: startY, vx: 0, vy: 0, hp: MAXHP, plat: plats[0], last: plats[0], dead: false, deadT: 0, floor: 0, face: 1, hurtT: 0, star: 0, spring: 0,
+          anim: new GG.Anim('bunnyP' + (i + 1), 'bunny') });
       }
       speed = playH * SPEED[0];
       GG.hud('地下 0 層');
@@ -181,7 +185,7 @@
       players.forEach(function (p) {
         if (p.hurtT > 0) p.hurtT -= dt;
         if (p.star > 0) p.star -= dt;
-        if (p.dead) { p.deadT += dt; p.vy += G * dt; p.y += p.vy * dt; return; }
+        if (p.dead) { p.deadT += dt; p.vy += G * dt; p.y += p.vy * dt; p.anim.update(dt); return; }
         var k = GG.keys, dir = (GG.held('R' + p.i) ? 1 : 0) - (GG.held('L' + p.i) ? 1 : 0);
         if (p.i === 0) dir += (k.ArrowRight ? 1 : 0) - (k.ArrowLeft ? 1 : 0);
         if (p.i === 1) dir += (k.d ? 1 : 0) - (k.a ? 1 : 0);
@@ -208,9 +212,17 @@
           }
         }
         p.x = GG.clamp(p.x, 20, W - 20);
+        var a = p.anim, conv = p.plat && (p.plat.type === 'convL' || p.plat.type === 'convR') ? (p.plat.type === 'convR' ? 1 : -1) : 0;
+        if (!p.plat) a.set(p.spring > 0 && p.vy < 0 ? 'jump' : 'fall');
+        else if (dir || conv) a.set('walk');
+        else a.set('idle');
+        a.update(dt, dir ? W * 0.3 : conv ? W * 0.12 : 0);
+        if (p.plat && conv && !dir) a.rig.root.r += -conv * p.face * 8;          // 被輸送帶帶著走：身體往後傾
+        if (p.plat && p.plat.type === 'flip' && p.plat.t - p.plat.stepT > 0.12) a.rig.root.r += Math.sin(t * 30) * 12; // 翻轉樓梯快翻了：踉蹌
         // 天花板
         if (p.y - BH < top) {
           hurt(p, 3, '好痛！');
+          p.anim.faceFor('x', 0.5);
           p.plat = null; p.y = top + BH + 4; p.vy = Math.max(p.vy, playH * 0.3);
         }
         if (p.y - BH > bot) rescue(p);
@@ -242,10 +254,9 @@
       });
       players.forEach(function (p) {
         if (p.dead && p.deadT > 2) return;
-        if (!p.dead && p.hurtT > 0 && Math.floor(p.hurtT * 12) % 2) return;
-        var key = 'p' + (p.i + 1) + '_' + (p.dead || p.hurtT > 0.4 ? 'hurt' : p.spring > 0 && !p.plat ? 'jump' : p.plat ? 'stand' : 'ready');
+        if (!p.dead && p.hurtT > 0 && p.anim.hurtT > 0.45 && Math.floor(p.hurtT * 12) % 2) return;
         if (p.star > 0) { ctx.fillStyle = 'rgba(255,225,77,' + (0.35 + Math.sin(t * 16) * 0.15) + ')'; ctx.beginPath(); ctx.arc(p.x, p.y - BH / 2, BH * 0.62, 0, Math.PI * 2); ctx.fill(); }
-        GG.spr(ctx, key, p.x, p.y - BH / 2, BH / GG.ratio(key), BH, { flip: p.face < 0, rot: p.dead ? p.deadT * 4 : 0 });
+        p.anim.draw(ctx, p.x, p.y + 2, BH * 1.12 / p.anim.rig.def.h, p.face < 0, { spin: p.dead ? p.deadT * 4 : 0 });
         if (np > 1 && !p.dead) {
           ctx.fillStyle = COLORS[p.i]; GG.rr(ctx, p.x - 18, p.y - BH - 26, 36, 22, 11); ctx.fill();
           GG.text(ctx, (p.i + 1) + 'P', p.x, p.y - BH - 15, 16, '#fff', 'center', true);
@@ -282,6 +293,7 @@
   });
 
   function land(p, pl) {
+    if (p.vy > playH * 0.25) p.anim.land(pl.type === 'spring' ? 1.5 : 1);
     p.y = pl.y; p.vy = 0; p.plat = pl; p.spring = 0;
     p.floor = Math.max(p.floor, pl.floor);
     if (pl.type === 'spike') hurt(p, 3, '尖刺！');

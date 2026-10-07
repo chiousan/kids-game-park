@@ -18,8 +18,8 @@
   function paintSky() { var c = SKY[Math.min(SKY.length, lvl) - 1]; GG.canvasLayer('sky').paint(function (g, w, h) { GG.bg(g, w, h, c[0], c[1]); }); }
   // 關卡：穿過越多岩石關卡越高，空隙變小、速度變快、岩石變密，出現新障礙與新獎勵
   var LV_AT = [0, 5, 12, 20, 30, 42];
-  var LV_MSG = ['', '速度變快、岩石變密！新獎勵：愛心', '新障礙：會上下移動的岩石　新獎勵：防護泡泡', '新障礙：飛飛怪',
-    '空隙變小了！新獎勵：大星星（+20）', '最高難度！飛飛怪變多了'];
+  var LV_MSG = ['', '速度變快、岩石變密！新獎勵：愛心', '新障礙：會上下移動的岩石　新獎勵：防護泡泡', '新障礙：胖麻雀',
+    '空隙變小了！新獎勵：大星星（+20）', '最高難度！胖麻雀變多了'];
   var lvl = 1, shield = false, foes = [], intro = null;
   // 每升一關：空隙小 7%、岩石間距短 4%（升關後第一座岩石一定帶著這關的新東西）
   var INTRO = { 2: 'heart', 3: 'shield', 4: 'foe', 5: 'big' };
@@ -36,7 +36,7 @@
     if (intro) { if (intro === 'foe') foe = true; else kind = intro; intro = null; }
     if (kind !== 'star' || Math.random() < 0.7) stars.push({ x: x + S * 0.6, rock: r, got: 0, kind: kind });
     // 第 4 關起，岩石之間會有飛飛怪
-    if (foe) foes.push({ x: x + curSpacing() / 2 + S, y0: GG.rand(H * 0.25, H - gh - H * 0.2), ph: Math.random() * 6, f: 0 });
+    if (foe) foes.push({ x: x + curSpacing() / 2 + S, y0: GG.rand(H * 0.25, H - gh - H * 0.2), ph: Math.random() * 6, f: 0, rig: new GG.Anim('sparrow') });
   }
   function hurt() {
     if (inv > 0) return;
@@ -61,9 +61,8 @@
 
   GG.define({
     countdown: true,
-    assets: { p1: 'plane/planeRed1', p2: 'plane/planeRed2', p3: 'plane/planeRed3', rock: 'plane/rockGrass', rockDown: 'plane/rockGrassDown',
-      star: 'plane/starGold', puff: 'plane/puffLarge', puffS: 'plane/puffSmall', bubble: 'space/shield',
-      wing1: 'bunny/wingMan1', wing2: 'bunny/wingMan2', wing3: 'bunny/wingMan3', wing4: 'bunny/wingMan4' },
+    assets: GG.extend(GG.rigAssets(['sparrow']), { p1: 'plane/planeRed1', p2: 'plane/planeRed2', p3: 'plane/planeRed3', rock: 'plane/rockGrass', rockDown: 'plane/rockGrassDown',
+      star: 'plane/starGold', puff: 'plane/puffLarge', puffS: 'plane/puffSmall', bubble: 'space/shield' }),
     start: function (d) {
       d0 = d; layout();
       gap = H * [0.42, 0.35, 0.3][d];
@@ -122,7 +121,7 @@
       for (i = foes.length - 1; i >= 0; i--) {
         var f = foes[i];
         if (flying) f.x -= spd * dt * 1.15;
-        f.ph += dt * 2.5; f.f += dt * 10;
+        f.ph += dt * 2.5; f.f += dt * 10; f.rig.update(dt);
         f.y = f.y0 + Math.sin(f.ph) * H * 0.08;
         if (f.x < -S) { foes.splice(i, 1); continue; }
         if (GG.dist(f.x, f.y, plane.x, plane.y) < S * 0.45) { hurt(); GG.burst(f.x, f.y, { n: 8, img: 'puff', size: 22, speed: 200, gravity: -40 }); foes.splice(i, 1); }
@@ -152,7 +151,8 @@
         // 深色底圈讓白翅膀在淺色天空上也看得清楚
         ctx.fillStyle = 'rgba(58,56,80,0.32)'; ctx.beginPath(); ctx.arc(f.x, f.y, S * 0.62, 0, Math.PI * 2); ctx.fill();
         ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,90,90,0.9)'; ctx.stroke();
-        GG.spr(ctx, 'wing' + (Math.floor(f.f) % 4 + 1), f.x, f.y, S * 1.6, null, { flip: true });
+        // 胖麻雀頭朝左，迎面飛過來
+        f.rig.draw(ctx, f.x, f.y + S * 0.6, S * 1.3 / f.rig.rig.def.h, false);
       });
       if (inv <= 0 || Math.floor(inv * 10) % 2 === 0)
         GG.spr(ctx, 'p' + (Math.floor(t * 18) % 3 + 1), plane.x, plane.y, S * 1.2, null, { rot: GG.clamp(plane.vy / H * 0.9, -0.5, 0.7) });

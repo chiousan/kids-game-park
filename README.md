@@ -11,7 +11,7 @@
 | 類別 | 遊戲 |
 |---|---|
 | 益智動腦 | 2048、寶石消消樂、方塊堆疊、動物翻翻樂、踩地雷、泡泡龍 |
-| 動作反應 | 恐龍世界（3D）、貪食蛇、打磚塊、跳跳大冒險、太空射擊、敲敲圓滾滾、飛飛小飛機、跳跳兔、小朋友下樓梯（1～4 人） |
+| 動作反應 | 恐龍世界（3D）、貪食蛇、打磚塊、跳跳大冒險、太空射擊、敲敲地鼠、飛飛小飛機、跳跳兔、小朋友下樓梯（1～4 人） |
 | 競速運動 | 公路賽車、投籃高手、點球大戰、釣魚樂 |
 | 雙人對戰（也可對電腦） | 桌上冰球、五子棋、坦克對戰、四子棋 |
 
@@ -33,6 +33,12 @@
 四關＝四個成長階段（寶寶→少年→成年→首領）：第 2 關迅猛龍出沒、出現金色果子／金色大肉；第 3 關暴龍和刺刺草叢、可以找恐龍蛋；第 4 關天黑、火山會噴石頭（地上先出現紅圈）、出現首領之星。
 被打倒只是「暈倒」，會回到恐龍巢休息（共 3 條命）；恐龍巢是安全區，肉食恐龍進不來。草食龍吃果子，肉食龍吃肉和抓魚，不血腥。
 左下搖桿走路，右下三顆鈕：攻擊（咬／甩尾／衝撞／大叫）、跳、吃／喝（附近有東西時會變大發亮）。簡單模式站在食物或水旁邊就會自動吃喝。
+
+### 可愛動物角色與身體律動
+
+主角兔兔與各遊戲的小動物（地鼠、金倉鼠、企鵝守門員、章魚、草帽貓咪、刺蝟、青蛙、小鳥、小蜜蜂、胖麻雀，以及泡泡裡的小動物、企鵝／狐狸棋子）都是原創繪製。
+會動的角色拆成部件（`assets/rig/`、`js/rigs.js`），由 `js/rig.js` 每一格即時擺動作：走路雙腳交叉、先蹲再跳、落地壓扁、被打到後仰閃白再晃回來、暈眩、開心慶祝、拍翅。
+部件圖由 scratchpad 的 `rig_export.py` 產生；`tools/rig_preview.html` 可以播放所有角色的動作。
 
 ### 操作方式
 
@@ -63,4 +69,4 @@
 
 ## 素材授權
 
-遊戲美術素材來自 [Kenney.nl](https://kenney.nl)，以 CC0（公眾領域）授權釋出：New Platformer Pack、Jumper Pack、Shape Characters、Animal Pack Remastered、Fish Pack、Tappy Plane、Space Shooter Remastered、Racing Pack、Puzzle Pack 1、Top-down Tanks Remastered、Boardgame Pack。籃球與足球圖示、主角兔兔（assets/bunny/hero_*、assets/stairs/p*）與恐龍世界的恐龍、封面為本專案原創繪製。3D 引擎 three.js 以 MIT 授權釋出。
+遊戲美術素材來自 [Kenney.nl](https://kenney.nl)，以 CC0（公眾領域）授權釋出：New Platformer Pack、Jumper Pack、Shape Characters、Animal Pack Remastered、Fish Pack、Tappy Plane、Space Shooter Remastered、Racing Pack、Puzzle Pack 1、Top-down Tanks Remastered、Boardgame Pack。籃球與足球圖示、主角兔兔（assets/bunny/hero_*、assets/stairs/p*）、恐龍世界的恐龍、所有可愛動物角色與封面為本專案原創繪製。3D 引擎 three.js 以 MIT 授權釋出。

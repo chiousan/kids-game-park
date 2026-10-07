@@ -1,7 +1,7 @@
 /* 五子棋：雙人或對電腦（藍方先下） */
 (function () {
   var N = 13, board, turn, mode, history, winLine, over, aiT, cs, ox, oy, lastPop, thinking;
-  var NAME = ['藍方', '紅方'];
+  var NAME = ['藍方企鵝', '紅方狐狸'];
   /* 一局一局打下去：第 2 局起盤面有石頭（不能下）、第 3 局起有星星格（下在上面可以再下一手）。
      對電腦：你每贏一局電腦就變強，連贏 5 局就是冠軍；雙人：先贏 3 局的人獲勝。 */
   var ROCK = -3, round = 1, wins = [0, 0], stars = [], roundEnd = 0;
@@ -156,7 +156,7 @@
       { label: '對電腦・簡單', value: 1, cls: 'b-easy' },
       { label: '對電腦・困難', value: 2, cls: 'b-hard' }
     ],
-    assets: { s0: 'board/chipBlueWhite', s1: 'board/chipRedWhite', rock: 'race/rock1' },
+    assets: { s0: 'animals/tok_blue', s1: 'animals/tok_red', rock: 'race/rock1' } /* 藍方企鵝、紅方狐狸 */,
     start: function (m) {
       mode = m; round = 1; wins = [0, 0];
       setupRound();

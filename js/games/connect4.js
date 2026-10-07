@@ -1,7 +1,7 @@
 /* 四子棋：雙人或對電腦（懶惰重繪；棋盤框預先畫好，挖洞後蓋在棋子上面） */
 (function () {
   var COLS = 7, ROWS = 6, board, turn, mode, cs, ox, oy, frame, drop, winLine, over, aiT, hoverC;
-  var NAME = ['藍方', '紅方'];
+  var NAME = ['藍方企鵝', '紅方狐狸'];
   /* 一局一局打下去：第 2 局起最下面有石頭（佔位置）、第 3 局起有星星格（棋子停在上面可以再下一次）。
      對電腦：你每贏一局電腦就變強（想得更遠），連贏 5 局就是冠軍；雙人：先贏 3 局的人獲勝。 */
   var ROCK = 2, round = 1, wins = [0, 0], stars = [], roundEnd = 0;
@@ -153,7 +153,7 @@
       { label: '對電腦・簡單', value: 1, cls: 'b-easy' },
       { label: '對電腦・困難', value: 2, cls: 'b-hard' }
     ],
-    assets: { s0: 'board/chipBlueWhite', s1: 'board/chipRedWhite', rock: 'race/rock1' },
+    assets: { s0: 'animals/tok_blue', s1: 'animals/tok_red', rock: 'race/rock1' } /* 藍方企鵝、紅方狐狸 */,
     start: function (m) {
       mode = m; round = 1; wins = [0, 0];
       setupRound();

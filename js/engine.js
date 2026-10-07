@@ -466,9 +466,11 @@
     if (banner.sub) GG.text(ctx, banner.sub, W / 2, y + 28, 24, '#ffffff', 'center', true);
     if (pauseT > 0) {
       var n = Math.ceil(pauseT), f = pauseT - Math.floor(pauseT);
-      ctx.fillStyle = 'rgba(20,16,50,0.9)'; ctx.beginPath(); ctx.arc(W / 2, y + bh / 2 + 6, 30, 0, Math.PI * 2); ctx.fill();
+      // 倒數圓圈畫在橫幅正下方，不蓋到「這關新出現了什麼」的說明
+      var cyN = y + bh / 2 + 38;
+      ctx.fillStyle = 'rgba(20,16,50,0.9)'; ctx.beginPath(); ctx.arc(W / 2, cyN, 30, 0, Math.PI * 2); ctx.fill();
       ctx.lineWidth = 4; ctx.strokeStyle = banner.color; ctx.stroke();
-      GG.text(ctx, String(n), W / 2, y + bh / 2 + 6, 40, '#ffe14d', 'center', true, 0.85 + f * 0.3);
+      GG.text(ctx, String(n), W / 2, cyN, 40, '#ffe14d', 'center', true, 0.85 + f * 0.3);
     }
     ctx.globalAlpha = 1;
   }

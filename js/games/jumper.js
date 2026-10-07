@@ -1,6 +1,6 @@
 /* 跳跳兔：踩著雲台一直往上跳（世界座標往上為負，攝影機跟著兔兔） */
 (function () {
-  var stick, used, W, H, G, V, pw, ph, bun, plats, items, clouds, camY, topY, best, lives, inv, d0, t, moveDir, jet, carrotN, coinN;
+  var hero, stick, used, W, H, G, V, pw, ph, bun, plats, items, clouds, camY, topY, best, lives, inv, d0, t, moveDir, jet, carrotN, coinN;
 
   function layout() {
     W = GG.W; H = GG.H;
@@ -21,7 +21,7 @@
   /* 關卡：依「那一片雲台的高度」決定種類，越高越難：
      2 關移動雲台＋彈簧、3 關會碎的蛋糕雲台＋紅蘿蔔、4 關飛飛怪＋噴射背包、5 關間距變大＋愛心 */
   var LV_AT = [0, 30, 70, 120, 180, 250];
-  var LV_MSG = ['', '新障礙：會移動的雲台　新獎勵：彈簧', '新障礙：一踩就碎的蛋糕雲台　新獎勵：紅蘿蔔', '新障礙：飛飛怪（從上面踩可以打倒）　新獎勵：噴射背包',
+  var LV_MSG = ['', '新障礙：會移動的雲台　新獎勵：彈簧', '新障礙：一踩就碎的蛋糕雲台　新獎勵：紅蘿蔔', '新障礙：小蜜蜂（從上面踩會暈暈飛走）　新獎勵：噴射背包',
     '雲台間距變大了！新獎勵：愛心', '最高難度！'];
   var lvl = 1, foes = [], lvOff = 0;
   function lvAt(y) { var m = -y / (H * 0.1) + lvOff, l = 1; while (l < LV_AT.length && m >= LV_AT[l]) l++; return l; }
@@ -38,7 +38,7 @@
       else if (L >= 5 && lives < 3 && q < 0.16) items.push({ kind: 'heart', x: p.x, y: y - ph * 1.6 });
       else if (q < 0.45) items.push({ kind: L >= 3 && Math.random() < 0.25 ? 'carrot' : 'coin', x: p.x, y: y - ph * 1.6 });
     }
-    if (L >= 4 && Math.random() < 0.12 + (L - 4) * 0.04) foes.push({ x: GG.rand(W * 0.15, W * 0.85), y: y - H * 0.06, x0: 0, ph: Math.random() * 6, dead: 0 });
+    if (L >= 4 && Math.random() < 0.12 + (L - 4) * 0.04) foes.push({ x: GG.rand(W * 0.15, W * 0.85), y: y - H * 0.06, x0: 0, ph: Math.random() * 6, dead: 0, rig: new GG.Anim('bee') });
     return p;
   }
   function fill() {
@@ -51,14 +51,14 @@
   }
   function ouch() {
     if (inv > 0) return;
-    lives--; inv = 1.5; GG.sfx('hurt'); GG.shake(10, 0.3);
+    lives--; inv = 1.5; GG.sfx('hurt'); GG.shake(10, 0.3); hero.hit(bun.face);
     if (lives <= 0) {
       var m = Math.floor(best / (H * 0.1)), th = [[30, 80, 150], [40, 100, 200], [50, 120, 250]][d0];
       GG.over({ score: m * 10 + coinN * 5 + carrotN * 20, stars: GG.starsFor(m, th[0], th[1], th[2]), text: '跳到第 ' + lvl + ' 關、' + m + ' 公尺高', delay: 600 });
     }
   }
   function hurt() {
-    lives--; inv = 1.5; GG.sfx('hurt'); GG.shake(10, 0.3);
+    lives--; inv = 1.5; GG.sfx('hurt'); GG.shake(10, 0.3); hero.faceFor('x', 1.2);
     if (lives <= 0) {
       var m = Math.floor(best / (H * 0.1)), th = [[30, 80, 150], [40, 100, 200], [50, 120, 250]][d0];
       GG.over({ score: m * 10 + coinN * 5 + carrotN * 20, stars: GG.starsFor(m, th[0], th[1], th[2]), text: '跳到 ' + m + ' 公尺高', delay: 600 });
@@ -73,20 +73,23 @@
 
   // 測試用：直接跳到第 n 關（截圖檢查用）
   GG.testLevel = function (n) { lvOff = LV_AT[Math.min(n, LV_AT.length) - 1] + 1; };
+  // 測試用：在兔兔正上方放一隻小蜜蜂（截圖檢查用）
+  GG.testJumper = { bee: function (dy) { foes.push({ x: bun.x - Math.sin(0) * W * 0.12, y: bun.y - (dy || H * 0.22), x0: 0, ph: 0, dead: 0, rig: new GG.Anim('bee') }); } };
 
   GG.define({
     noHint: true,
     countdown: true,
-    assets: { jump: 'bunny/hero_jump', stand: 'bunny/hero_stand', ready: 'bunny/hero_ready', hurt: 'bunny/hero_hurt',
+    assets: GG.extend(GG.rigAssets(['bunny', 'bee']), {
       grass: 'bunny/ground_grass_small', move: 'bunny/ground_snow_small', brk: 'bunny/ground_cake_small',
       spring: 'bunny/spring', springOut: 'bunny/spring_out', jet: 'bunny/jetpack_item', jetOn: 'bunny/jetpack', carrot: 'bunny/carrot',
-      foe: 'bunny/flyMan_fly', foeHit: 'bunny/flyMan_still_fly', g1: 'bunny/gold_1', g2: 'bunny/gold_2', g3: 'bunny/gold_3', g4: 'bunny/gold_4', cloud: 'bunny/cloud' },
+      g1: 'bunny/gold_1', g2: 'bunny/gold_2', g3: 'bunny/gold_3', g4: 'bunny/gold_4', cloud: 'bunny/cloud' }),
     start: function (d) {
       d0 = d; layout();
       plats = []; items = []; foes = []; lvl = 1; lvOff = 0; camY = -H; best = 0; lives = 3; inv = 0; t = 0; moveDir = 0; used = false; jet = 0; carrotN = 0; coinN = 0;
       var base = { x: W / 2, y: -H * 0.12, kind: 'grass', vx: 0, broken: 0 };
       plats.push(base); topY = base.y;
       bun = { x: W / 2, y: base.y - ph * 0.5, vx: 0, vy: -V, face: 1, startY: base.y };
+      hero = new GG.Anim('bunny');
       fill();
       clouds = [];
       for (var i = 0; i < 4; i++) clouds.push({ x: Math.random() * W, y: Math.random() * H, s: GG.rand(0.6, 1) });
@@ -101,7 +104,11 @@
       if (dir) bun.face = dir > 0 ? 1 : -1;
       bun.x += bun.vx * dt;
       if (bun.x < -20) bun.x += W + 40; else if (bun.x > W + 20) bun.x -= W + 40;
-      if (jet > 0) { jet -= dt; bun.vy = -V * 1.4; GG.burst(bun.x, bun.y - camY + 10, { n: 1, colors: ['#ffb347', '#fff3a0'], size: 10, speed: 80, gravity: 300, angle: Math.PI / 2, life: 0.4 }); }
+      // 踩在雲台上壓扁的那一下：跟著雲台，時間到才往上彈
+      if (bun.stand > 0 && jet <= 0) {
+        bun.stand -= dt; bun.y = bun.plat.y - ph * 0.35;
+        if (bun.stand <= 0) { bun.vy = bun.boost; bun.stand = 0; }
+      } else if (jet > 0) { bun.stand = 0; jet -= dt; bun.vy = -V * 1.4; GG.burst(bun.x, bun.y - camY + 10, { n: 1, colors: ['#ffb347', '#fff3a0'], size: 10, speed: 80, gravity: 300, angle: Math.PI / 2, life: 0.4 }); }
       else bun.vy += G * dt;
       var oldY = bun.y;
       bun.y += bun.vy * dt;
@@ -113,11 +120,11 @@
           var topP = p.y - ph * 0.35;
           if (oldY <= topP && bun.y >= topP && Math.abs(bun.x - p.x) < pw * 0.55) {
             if (p.kind === 'break') { p.broken = 0.01; GG.sfx('hit'); continue; }
-            bun.y = topP; bun.vy = -V; GG.sfx('jump');
+            bun.y = topP; bun.vy = 0; bun.stand = 0.08; bun.plat = p; bun.boost = -V; GG.sfx('jump'); hero.land();
             for (var si = 0; si < items.length; si++) {
               var sp = items[si];
               if (sp.kind === 'spring' && sp.p === p && Math.abs(bun.x - (p.x + sp.dx)) < 42) {
-                bun.vy = -V * 1.6; sp.used = 0.4; GG.sfx('power');
+                bun.boost = -V * 1.6; sp.used = 0.4; GG.sfx('power'); hero.land(1.5);
                 GG.floatText(bun.x, topP - camY - 60, '彈簧！', '#fff', 28);
               }
             }
@@ -156,15 +163,18 @@
       for (i = foes.length - 1; i >= 0; i--) {
         var f = foes[i];
         if (f.y > camY + H + 100) { foes.splice(i, 1); continue; }
-        if (f.dead) { f.dead += dt; f.y += 600 * dt; if (f.dead > 1) foes.splice(i, 1); continue; }
-        f.ph += dt * 1.5;
+        if (f.dead) { f.dead += dt; f.y += 600 * dt; f.rig.update(dt); if (f.dead > 1) foes.splice(i, 1); continue; }
+        f.ph += dt * 1.5; f.rig.update(dt);
         var fx = f.x + Math.sin(f.ph) * W * 0.12, bhh = Math.min(110, H * 0.11);
         if (Math.abs(bun.x - fx) < 50 && Math.abs(bun.y - bhh * 0.5 - f.y) < 50) {
-          if (bun.vy > 0 && bun.y - bhh * 0.3 < f.y) { f.dead = 0.01; bun.vy = -V * 1.1; coinN += 4; GG.sfx('pop'); GG.floatText(fx, f.y - camY - 40, '+20', '#ffe14d', 28); GG.burst(fx, f.y - camY, { n: 10, img: '_star', size: 20, speed: 260 }); }
+          if (bun.vy > 0 && bun.y - bhh * 0.3 < f.y) { f.dead = 0.01; f.rig.set('dizzy'); f.rig.faceFor('x', 2); bun.vy = -V * 1.1; coinN += 4; GG.sfx('pop'); GG.floatText(fx, f.y - camY - 40, '+20', '#ffe14d', 28); GG.burst(fx, f.y - camY, { n: 10, img: '_star', size: 20, speed: 260 }); }
           else if (jet <= 0) ouch();
         }
       }
       fill();
+      hero.set(bun.vy < 0 ? 'jump' : 'fall');
+      hero.update(dt);
+      hero.rig.root.r += GG.clamp(bun.vx / (W * 0.85), -1, 1) * 10 * bun.face;
       if (bun.y > camY + H + 40 && inv <= 0) hurt();
       GG.setScore(Math.floor(best / (H * 0.1)) * 10 + coinN * 5 + carrotN * 20);
     },
@@ -177,7 +187,8 @@
       foes.forEach(function (f) {
         var fy = f.y - camY;
         if (fy < -60 || fy > h + 60) return;
-        GG.spr(ctx, f.dead ? 'foeHit' : 'foe', f.x + Math.sin(f.ph) * w * 0.12, fy, 70, null, f.dead ? { rot: f.dead * 6 } : null);
+        // 蜜蜂頭朝左；往右飄的時候翻面
+        f.rig.draw(ctx, f.x + Math.sin(f.ph) * w * 0.12, fy + 38, 84 / f.rig.rig.def.h, Math.cos(f.ph) > 0, { spin: f.dead ? f.dead * 6 : 0 });
       });
       plats.forEach(function (p) {
         var y = p.y - camY;
@@ -195,9 +206,9 @@
         else { var gk = 'g' + frame; GG.spr(ctx, gk, ix, iy, 36 / GG.ratio(gk), 36); }
       });
       if (inv <= 0 || Math.floor(inv * 10) % 2 === 0) {
-        var key = inv > 1.1 ? 'hurt' : bun.vy < 0 ? 'jump' : 'ready', bh = Math.min(110, h * 0.11);
+        var bh = Math.min(130, h * 0.13) * 1.25;
         if (jet > 0) GG.spr(ctx, 'jetOn', bun.x - bun.face * bh * 0.2, bun.y - camY - bh * 0.4, bh * 0.5, null);
-        GG.spr(ctx, key, bun.x, bun.y - camY - bh / 2 + 4, bh / GG.ratio(key), bh, bun.face < 0 ? { flip: true } : null);
+        hero.draw(ctx, bun.x, bun.y - camY + 4, bh / hero.rig.def.h, bun.face < 0);
       }
       GG.lives(ctx, lives, 3, 12, 30, 30);
       GG.hudText(ctx, '第 ' + lvl + ' 關・' + Math.floor(best / (h * 0.1)) + ' 公尺', w - 18, 30, 22, '#fff', 'right');

@@ -1,6 +1,6 @@
 /* 釣魚樂：點水裡的魚，小船開過去放下魚鉤 */
 (function () {
-  var W, H, waterY, sandY, boat, hook, fish, score, caught, timeLeft, totalT, spawnT, d0, t;
+  var W, H, waterY, sandY, boat, hook, fish, score, caught, timeLeft, totalT, spawnT, d0, t, cat, tip;
   // lv：第幾關開始出現。bad＝會扣分的障礙魚；time＝時間泡泡；gold＝黃金魚
   var TYPES = [
     { k: 'fish_blue', pts: 10, s: 1, sp: 1, lv: 1, w: 3 }, { k: 'fish_green', pts: 10, s: 1, sp: 1, lv: 1, w: 3 }, { k: 'fish_orange', pts: 15, s: 0.9, sp: 1.2, lv: 1, w: 2 },
@@ -53,17 +53,18 @@
 
   GG.define({
     countdown: true,
-    assets: { boatman: 'blob/yellow_smile', bubble: 'fish/bubble_a', sand: 'fish/terrain_sand_a', sandTop: 'fish/terrain_sand_top_a',
+    assets: GG.extend(GG.rigAssets(['cat']), { bubble: 'fish/bubble_a', sand: 'fish/terrain_sand_a', sandTop: 'fish/terrain_sand_top_a',
       fish_blue: 'fish/fish_blue', fish_green: 'fish/fish_green', fish_orange: 'fish/fish_orange', fish_pink: 'fish/fish_pink', fish_red: 'fish/fish_red',
       fish_grey: 'fish/fish_grey', fish_skeleton: 'fish/fish_skeleton', fish_brown: 'fish/fish_brown',
       background_seaweed_a: 'fish/background_seaweed_a', background_seaweed_c: 'fish/background_seaweed_c', background_seaweed_e: 'fish/background_seaweed_e',
       background_rock_a: 'fish/background_rock_a', background_rock_b: 'fish/background_rock_b',
       seaweed_green_a: 'fish/seaweed_green_a', seaweed_green_c: 'fish/seaweed_green_c', seaweed_pink_a: 'fish/seaweed_pink_a',
-      seaweed_orange_a: 'fish/seaweed_orange_a', seaweed_grass_a: 'fish/seaweed_grass_a', rock_a: 'fish/rock_a', rock_b: 'fish/rock_b' },
+      seaweed_orange_a: 'fish/seaweed_orange_a', seaweed_grass_a: 'fish/seaweed_grass_a', rock_a: 'fish/rock_a', rock_b: 'fish/rock_b' }),
     start: function (d) {
       d0 = d; layout();
       totalT = [75, 60, 50][d]; timeLeft = totalT; lvl = 1; el = 0; score = 0; caught = 0; spawnT = 0; t = 0;
       boat = { x: W / 2, tx: W / 2 };
+      cat = new GG.Anim('cat'); tip = null;
       hook = { st: 'idle', y: waterY - 10, ty: 0, fish: null };
       fish = [];
       for (var i = 0; i < 6; i++) { spawnFish(); fish[i].x = GG.rand(W * 0.1, W * 0.9); }
@@ -84,7 +85,11 @@
       if (spawnT <= 0 && fish.length < [8, 9, 10][d0]) { spawnFish(); spawnT = GG.rand(0.6, 1.3); }
       boat.x = GG.lerp(boat.x, boat.tx, Math.min(1, dt * 8));
       var hr = Math.min(W, H) * [0.07, 0.055, 0.045][d0];
-      if (hook.st === 'move' && Math.abs(boat.x - boat.tx) < 6) hook.st = 'drop';
+      if (hook.st === 'move' && Math.abs(boat.x - boat.tx) < 6) { hook.st = 'drop'; cat.set('cast'); }
+      if (hook.st === 'reel' && cat.mode !== 'reel') cat.set('reel');
+      if (hook.st === 'idle' && (cat.mode === 'reel' || cat.mode === 'cast')) cat.set('idle');
+      if ((cat.mode === 'happy' && cat.mt > 1.2) || (cat.mode === 'scared' && cat.mt > 0.8)) cat.set('idle');
+      cat.update(dt);
       if (hook.st === 'drop') {
         hook.y += H * 1.1 * dt;
         for (var i = 0; i < fish.length; i++) {
@@ -103,10 +108,10 @@
           hook.y = waterY - 10; hook.st = 'idle';
           if (hook.fish) {
             var f2 = hook.fish, pts = f2.ty.pts;
-            if (f2.ty.time) { timeLeft += 5; GG.sfx('power'); GG.floatText(boat.x, waterY - 70, '+5 秒', '#9fe3ff', 34); fish.splice(fish.indexOf(f2), 1); hook.fish = null; return; }
+            if (f2.ty.time) { timeLeft += 5; GG.sfx('power'); cat.set('happy'); GG.floatText(boat.x, waterY - 70, '+5 秒', '#9fe3ff', 34); fish.splice(fish.indexOf(f2), 1); hook.fish = null; return; }
             score = Math.max(0, score + pts); GG.setScore(score);
-            if (pts > 0) { caught++; GG.sfx('coin'); GG.burst(boat.x, waterY - 40, { n: 10, img: '_star', size: 22, speed: 280 }); }
-            else { GG.sfx('hurt'); GG.shake(8, 0.25); }
+            if (pts > 0) { caught++; GG.sfx('coin'); GG.burst(boat.x, waterY - 40, { n: 10, img: '_star', size: 22, speed: 280 }); cat.set('happy'); }
+            else { GG.sfx('hurt'); GG.shake(8, 0.25); cat.set('scared'); cat.hit(1); }
             GG.floatText(boat.x, waterY - 70, (pts > 0 ? '+' : '') + pts, pts > 0 ? '#ffe14d' : '#ff6b6b', 34);
             fish.splice(fish.indexOf(f2), 1);
             hook.fish = null;
@@ -132,17 +137,19 @@
         }
         GG.spr(ctx, f.ty.k, f.x, f.y + (f.hooked ? 0 : Math.sin(f.ph) * 6), f.size, null, { flip: f.dir < 0, rot: f.hooked ? -Math.PI / 2 + wob : 0 });
       });
-      // 釣線與魚鉤
       var bx = boat.x, rodX = bx + 50, hp = hookPos();
-      ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(rodX, waterY - 70); ctx.lineTo(rodX, hp.y); ctx.stroke();
+      var by = waterY - 8 + Math.sin(t * 2) * 3;
+      // 戴草帽的貓咪漁夫（自己拿著釣竿），坐在船裡
+      var cs = 124 / cat.rig.def.h, rt = GG.RIGS.cat.rodTip;
+      cat.draw(ctx, bx - 8, by - 6, cs, false);
+      tip = cat.rig.pointOf('arm', rt[0], rt[1]);
+      var tx = tip ? tip.x : rodX, ty = tip ? tip.y : waterY - 70;
+      // 釣線與魚鉤
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(tx, ty); ctx.lineTo(rodX, hp.y); ctx.stroke();
       ctx.strokeStyle = GG.INK; ctx.lineWidth = 4; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(rodX - 6, hp.y + 4, 8, 0, Math.PI); ctx.stroke();
       // 小船
-      var by = waterY - 8 + Math.sin(t * 2) * 3;
-      GG.spr(ctx, 'boatman', bx, by - 52, 74, 74);
-      ctx.strokeStyle = '#8d5a2b'; ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.moveTo(bx + 18, by - 40); ctx.lineTo(rodX, waterY - 70); ctx.stroke();
       ctx.fillStyle = '#c96f3b'; ctx.beginPath();
       ctx.moveTo(bx - 70, by - 22); ctx.lineTo(bx + 70, by - 22); ctx.lineTo(bx + 50, by + 10); ctx.lineTo(bx - 50, by + 10); ctx.closePath(); ctx.fill();
       ctx.lineWidth = 4; ctx.strokeStyle = GG.INK; ctx.stroke();
