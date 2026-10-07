@@ -73,8 +73,8 @@
     GG.GAMES.forEach(function (g) {
       if (cur !== 'all' && g.cat !== cur) return;
       var a = document.createElement('a');
-      // 大格（2x2）與寬格（2x1）穿插：22 款剛好排滿 4 欄或 6 欄，不留空洞
-      var size = cur !== 'all' ? (n === 0 ? ' big' : '') : [0, 6, 12, 17].indexOf(n) >= 0 ? ' big' : [1, 18].indexOf(n) >= 0 ? ' wide' : '';
+      // 大格（2x2）與寬格（2x1）穿插：23 款＝4 大格＋1 寬格＋18 小格＝36 格，剛好排滿 4 欄或 6 欄，不留空洞
+      var size = cur !== 'all' ? (n === 0 ? ' big' : '') : [0, 7, 13, 18].indexOf(n) >= 0 ? ' big' : n === 2 ? ' wide' : '';
       a.className = 'tile' + size;
       a.href = 'game.html?g=' + g.id;
       a.style.animationDelay = (n * 0.03) + 's';

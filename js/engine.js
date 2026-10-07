@@ -466,8 +466,9 @@
     if (banner.sub) GG.text(ctx, banner.sub, W / 2, y + 28, 24, '#ffffff', 'center', true);
     if (pauseT > 0) {
       var n = Math.ceil(pauseT), f = pauseT - Math.floor(pauseT);
-      ctx.fillStyle = 'rgba(20,16,50,0.55)'; ctx.beginPath(); ctx.arc(W / 2, y + bh / 2 + 52, 38, 0, Math.PI * 2); ctx.fill();
-      GG.text(ctx, String(n), W / 2, y + bh / 2 + 52, 46, '#ffffff', 'center', true, 0.85 + f * 0.3);
+      ctx.fillStyle = 'rgba(20,16,50,0.9)'; ctx.beginPath(); ctx.arc(W / 2, y + bh / 2 + 6, 30, 0, Math.PI * 2); ctx.fill();
+      ctx.lineWidth = 4; ctx.strokeStyle = banner.color; ctx.stroke();
+      GG.text(ctx, String(n), W / 2, y + bh / 2 + 6, 40, '#ffe14d', 'center', true, 0.85 + f * 0.3);
     }
     ctx.globalAlpha = 1;
   }
@@ -560,10 +561,15 @@
   }
   /* 測試用：同步推進 n 個畫格 */
   GG.step = function (n, dt) {
+    dt = dt || 1 / 60;
     for (var i = 0; i < n; i++) {
       if (state === 'count') { countT = -1; state = 'play'; }
       if (state !== 'play') break;
-      game.update(dt || 1 / 60); updateParts(dt || 1 / 60);
+      // 和真正的迴圈一樣：升關暫停時遊戲不動，橫幅照樣計時
+      if (pauseT > 0) { pauseT -= dt; if (pauseT < 0) pauseT = 0; }
+      else game.update(dt);
+      if (banner) { banner.t += dt; if (banner.t > LEVEL_PAUSE + 0.4) banner = null; }
+      updateParts(dt);
     }
     draw();
   };

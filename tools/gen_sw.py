@@ -23,7 +23,8 @@ h = hashlib.sha1()
 for p in files:
     h.update(p.encode()); h.update(open(os.path.join(ROOT, p), 'rb').read())
 ver = h.hexdigest()[:10]
-core = ['./'] + [p for p in files if p.endswith(('.html', '.css', '.js', '.webmanifest'))]
+# 大的程式庫（three.js 約 600KB）不放進安裝清單，啟用後在背景補抓
+core = ['./'] + [p for p in files if p.endswith(('.html', '.css', '.js', '.webmanifest')) and not p.startswith('js/lib/')]
 rest = [p for p in files if p not in core]
 fmt = lambda lst: ',\n  '.join("'" + p + "'" for p in lst)
 sw = """/* 離線快取（版本號由內容自動產生）：核心檔安裝時快取，其餘檔案啟用後在背景補抓 */

@@ -10,6 +10,8 @@ GG.CATS = [
 ];
 
 GG.GAMES = [
+  { id: 'dino', ctrl: 'stick', name: '恐龍世界', cat: 'action', c1: '#7fd36b', c2: '#2e8b57',
+    desc: '從寶寶長大成首領', how: '選一隻恐龍，用搖桿在小島上走路。按「吃」吃東西、在水池邊按「喝」喝水，吃飽喝足就會長大升一關！小心肉食恐龍，按紅色鈕保護自己，打不過就躲回恐龍巢。' },
   { id: 'g2048', ctrl: 'swipe', name: '2048', cat: 'puzzle', c1: '#ffb547', c2: '#ff7a3d',
     desc: '滑動合併數字', how: '往上下左右滑動，一樣的數字碰在一起就會合併。挑戰合出 2048！' },
   { id: 'gems', ctrl: 'swipe', name: '寶石消消樂', cat: 'puzzle', c1: '#b06cff', c2: '#6a5cff',

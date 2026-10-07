@@ -1,16 +1,19 @@
 /* 離線快取（版本號由內容自動產生）：核心檔安裝時快取，其餘檔案啟用後在背景補抓 */
-var CACHE = 'gg-878673c77f';
+var CACHE = 'gg-57b15ed932';
 var CORE = [
   './',
   'css/style.css',
   'game.html',
   'index.html',
+  'js/dino/anim.js',
+  'js/dino/sculpt.js',
   'js/engine.js',
   'js/games.js',
   'js/games/blocks.js',
   'js/games/breakout.js',
   'js/games/bubble.js',
   'js/games/connect4.js',
+  'js/games/dino.js',
   'js/games/fishing.js',
   'js/games/flappy.js',
   'js/games/g2048.js',
@@ -120,6 +123,7 @@ var FILES = [
   'assets/covers/breakout.jpg',
   'assets/covers/bubble.jpg',
   'assets/covers/connect4.jpg',
+  'assets/covers/dino.jpg',
   'assets/covers/fishing.jpg',
   'assets/covers/flappy.jpg',
   'assets/covers/g2048.jpg',
@@ -165,6 +169,7 @@ var FILES = [
   'assets/icons/breakout.png',
   'assets/icons/bubble.png',
   'assets/icons/connect4.png',
+  'assets/icons/dino.png',
   'assets/icons/fishing.png',
   'assets/icons/flappy.png',
   'assets/icons/g2048.png',
@@ -314,7 +319,8 @@ var FILES = [
   'assets/ui/heart_empty.png',
   'assets/ui/star.png',
   'icon-180.png',
-  'icon-512.png'
+  'icon-512.png',
+  'js/lib/three.min.js'
 ];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(CORE); }).then(function () { return self.skipWaiting(); }));
